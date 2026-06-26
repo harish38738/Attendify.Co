@@ -914,7 +914,7 @@ async def preview_resource(resource_id: str, request: Request):
     )
 
 @api_router.post("/resources/subjects/{subject_id}/resources")
-async def upload_resource(subject_id: str, category: str = Form(...), displayName: Optional[str] = Form(None), file: UploadFile = File(...), request: Request):
+async def upload_resource(request: Request, subject_id: str, category: str = Form(...), displayName: Optional[str] = Form(None), file: UploadFile = File(...)):
     admin = await get_current_admin(request)
     if not await _validate_resource_category(category):
         return APIResponse(success=False, message="Invalid resource category").model_dump()
@@ -955,7 +955,7 @@ async def upload_resource(subject_id: str, category: str = Form(...), displayNam
     return APIResponse(success=True, message="Resource uploaded", data={"resource": await _build_resource_response(resource_doc)}).model_dump()
 
 @api_router.put("/resources/{resource_id}/replace")
-async def replace_resource(resource_id: str, file: UploadFile = File(...), request: Request):
+async def replace_resource(request: Request, resource_id: str, file: UploadFile = File(...)):
     await get_current_admin(request)
     resource = await db.resources.find_one({"id": resource_id}, {"_id": 0})
     if not resource:

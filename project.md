@@ -26,6 +26,7 @@ Root contains two main folders:
   - `src/` — React application source code
   - `src/context/AuthContext.js` — authentication context/provider
   - `src/utils/api.js` — Axios API client with credentials handling
+  - `src/utils/resourceHelpers.js` — shared download/preview helpers for resource files
   - `src/components/` — UI layout, route protection, reusable UI components
   - `src/pages/` — application pages and workflows
   - `public/` — static web assets
@@ -187,7 +188,9 @@ Frontend local env:
     - `/auth/callback`
     - `/join/:joinCode`
   - Admin routes under `/` guarded by `PrivateRoute` and rendered inside `Layout`.
+    - Includes `/resources` for admin resource management.
   - Student routes under `/student` guarded by `PrivateRoute`.
+    - Includes `/student/resources` for browsing and downloading study materials.
   - Fallback route redirects authenticated users to the appropriate dashboard.
 
 - `src/context/AuthContext.js`
@@ -222,12 +225,14 @@ Frontend local env:
 - `src/pages/AttendanceMarking.jsx` — mark or edit attendance per period
 - `src/pages/AttendanceReport.jsx` — view and export attendance report
 - `src/pages/AdminManagement.jsx` — manage approved admin email list
+- `src/pages/Resources.jsx` — manage resource subjects, upload/replace/rename/delete files
 
 #### Student pages
 
 - `src/pages/StudentDashboard.jsx` — student attendance summary, eligibility, and today's attendance
 - `src/pages/StudentHistory.jsx` — student attendance history
 - `src/pages/StudentClassmates.jsx` — list classmates in the student’s class
+- `src/pages/StudentResources.jsx` — browse subjects, filter/search resources, download and preview files
 
 #### Login and join flows
 
@@ -270,7 +275,8 @@ Frontend local env:
 - Backend auth and session logic: `Backened/server.py`, sections starting at `@api_router.post("/auth/google-session")`, `@api_router.post("/auth/student-login")`, and `_get_valid_session`.
 - Frontend auth flow: `Frontend/src/context/AuthContext.js`, `Frontend/src/pages/Login.jsx`, `Frontend/src/pages/AuthCallback.jsx`.
 - Class and attendance management: `Frontend/src/pages/Classes.jsx`, `Frontend/src/pages/Students.jsx`, `Frontend/src/pages/AttendanceMarking.jsx`, `Frontend/src/pages/AttendanceReport.jsx`.
-- Student experience: `Frontend/src/pages/StudentDashboard.jsx`, `Frontend/src/pages/StudentHistory.jsx`, `Frontend/src/pages/StudentClassmates.jsx`.
+- Student experience: `Frontend/src/pages/StudentDashboard.jsx`, `Frontend/src/pages/StudentHistory.jsx`, `Frontend/src/pages/StudentClassmates.jsx`, `Frontend/src/pages/StudentResources.jsx`.
+- Resource management: `Frontend/src/pages/Resources.jsx` (admin), `Frontend/src/pages/StudentResources.jsx` (student), `Frontend/src/utils/resourceHelpers.js`.
 
 ## Key dependencies
 

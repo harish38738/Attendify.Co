@@ -15,6 +15,7 @@ import AdminManagement from './pages/AdminManagement';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentHistory from './pages/StudentHistory';
 import StudentClassmates from './pages/StudentClassmates';
+import Resources from './pages/Resources';
 import StudentResources from './pages/StudentResources';
 import StudentProfile from './pages/StudentProfile';
 import StudentNotifications from './pages/StudentNotifications';
@@ -59,6 +60,7 @@ const AppRoutes = () => {
         <Route path="attendance" element={<AttendanceMarking />} />
         <Route path="reports" element={<AttendanceReport />} />
         <Route path="admins" element={<AdminManagement />} />
+        <Route path="resources" element={<Resources />} />
       </Route>
 
       {/* Student Routes */}
