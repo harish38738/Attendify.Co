@@ -1,0 +1,44 @@
+# ─── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# ─── Environment / Secrets ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Node / React ────────────────────────────────────────────────────────────
+Frontend/node_modules/
+Frontend/build/
+Frontend/.env
+Frontend/.env.*
+!Frontend/.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Development & Debug Scripts (not shipped to production) ─────────────────
+Backened/validate_fixes.py
+Backened/test_cookie_fix.py
+fix_braces.py
+patch_server.py
+scratch/
+
+# ─── IDE & OS ────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# ─── Uploaded files (runtime data, not source code) ──────────────────────────
+Backened/uploads/
+Backened/timetables/
