@@ -7,6 +7,11 @@ import requests
 import os
 import uuid
 
+# Skip obsolete test module since admin auth /api/auth/login has been removed in V1.0.0
+pytestmark = pytest.mark.skip(
+    reason="Obsolete: targets removed password-based admin login `/api/auth/login`. Admin login in V1.0.0 uses Google OAuth (`/api/auth/google-admin`)."
+)
+
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # =====================================

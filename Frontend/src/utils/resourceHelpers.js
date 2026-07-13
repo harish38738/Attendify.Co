@@ -19,9 +19,7 @@ export const downloadResource = async (resourceId, filename) => {
   window.URL.revokeObjectURL(url);
 };
 
-export const previewResource = async (resourceId) => {
-  const res = await api.get(`/api/resources/${resourceId}/preview`, { responseType: 'blob' });
-  const url = window.URL.createObjectURL(new Blob([res.data], { type: res.headers['content-type'] }));
-  window.open(url, '_blank', 'noopener,noreferrer');
-  setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+export const getResourcePreviewUrl = (resourceId) => {
+  const baseUrl = api.defaults.baseURL || '';
+  return `${baseUrl}/api/resources/${encodeURIComponent(resourceId)}/preview`;
 };

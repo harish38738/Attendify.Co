@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -12,16 +12,29 @@ import {
   DialogTrigger,
 } from '../components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import { Plus, Users as UsersIcon, User, Trash2, Pencil } from 'lucide-react';
+import { Plus, Users as UsersIcon, User, Trash2, Pencil, Key } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 
 const Students = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [students, setStudents] = useState([]);
@@ -34,10 +47,11 @@ const Students = () => {
   const [editTarget, setEditTarget] = useState(null);
   const [editData, setEditData] = useState({ name: '', roll_number: '' });
 
-  useEffect(() => { fetchClasses(); }, []);
-  useEffect(() => { if (selectedClass) fetchStudents(); }, [selectedClass]);
+  // Reset Password
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetting, setResetting] = useState(false);
 
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async () => {
     try {
       const res = await api.get('/api/classes');
       if (res.data.success) {
@@ -50,9 +64,9 @@ const Students = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     if (!selectedClass) return;
     try {
       const res = await api.get(`/api/classes/${selectedClass}/students`);
@@ -60,7 +74,15 @@ const Students = () => {
     } catch (error) {
       toast.error('Failed to fetch students');
     }
-  };
+  }, [selectedClass]);
+
+  useEffect(() => {
+    fetchClasses();
+  }, [fetchClasses]);
+
+  useEffect(() => {
+    if (selectedClass) fetchStudents();
+  }, [selectedClass, fetchStudents]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -113,25 +135,24 @@ const Students = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-      </div>
-    );
-  }
-
-  if (classes.length === 0) {
-    return (
-      <div className="p-4 md:p-8">
-        <Card className="p-8 md:p-12 text-center bg-white border border-slate-200 rounded-lg shadow-sm">
-          <UsersIcon className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-slate-900 mb-2">No Classes Available</h3>
-          <p className="text-slate-600">Please create a class first before adding students</p>
-        </Card>
-      </div>
-    );
-  }
+  const handleResetPassword = async () => {
+    if (!resetTarget) return;
+    if (!isSuperAdmin) return;
+    setResetting(true);
+    try {
+      const res = await api.post(`/api/admin/students/${resetTarget.id}/reset-password`);
+      if (res.data.success) {
+        toast.success(`Password reset to roll number for ${resetTarget.name}`);
+      } else {
+        toast.error(res.data.message || 'Failed to reset password');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reset password');
+    } finally {
+      setResetting(false);
+      setResetTarget(null);
+    }
+  };
 
   return (
     <div className="p-4 md:p-8" data-testid="students-page">
@@ -143,7 +164,7 @@ const Students = () => {
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="add-student-button" disabled={!selectedClass} className="bg-blue-900 hover:bg-blue-800 text-white w-full sm:w-auto">
+            <Button data-testid="add-student-button" disabled={!selectedClass || loading} className="bg-blue-900 hover:bg-blue-800 text-white w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" /> Add Student
             </Button>
           </DialogTrigger>
@@ -167,64 +188,90 @@ const Students = () => {
         </Dialog>
       </div>
 
-      <div className="mb-6">
-        <Label className="text-slate-700 font-medium mb-2 block">Select Class</Label>
-        <Select value={selectedClass} onValueChange={setSelectedClass}>
-          <SelectTrigger data-testid="class-selector" className="w-full bg-white border-slate-200">
-            <SelectValue placeholder="Select a class" />
-          </SelectTrigger>
-          <SelectContent>
-            {classes.map((cls) => (
-              <SelectItem key={cls.id} value={cls.id}>{cls.name} ({cls.code})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {students.length > 0 ? (
-        <Card className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full" data-testid="students-table">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Name</th>
-                  <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Roll Number</th>
-                  <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((student, index) => (
-                  <tr key={student.id} data-testid={`student-row-${index}`} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-blue-50 rounded-full flex-shrink-0"><User className="h-3 w-3 text-blue-600" /></div>
-                        <span className="font-medium text-slate-900 text-sm truncate">{student.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-900 font-mono text-xs">{student.roll_number}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(student)} className="text-slate-500 hover:text-blue-600 hover:bg-blue-50" data-testid={`edit-student-${index}`}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(student.id, student.name)} className="text-rose-600 hover:bg-rose-50" data-testid={`delete-student-${index}`}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {loading ? (
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900"></div>
+        </div>
+      ) : classes.length === 0 ? (
+        <Card className="p-8 md:p-12 text-center bg-white border border-slate-200 rounded-lg shadow-sm">
+          <UsersIcon className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-slate-900 mb-2">No Classes Available</h3>
+          <p className="text-slate-600 mb-6">Please create a class first before adding students</p>
         </Card>
       ) : (
-        <Card className="p-8 md:p-12 text-center bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="no-students-message">
-          <UsersIcon className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-slate-900 mb-2">No Students in This Class</h3>
-          <p className="text-slate-600 mb-6">Add students manually or share the join link</p>
-          <Button onClick={() => setDialogOpen(true)} className="bg-blue-900 hover:bg-blue-800 text-white"><Plus className="h-4 w-4 mr-2" /> Add Your First Student</Button>
-        </Card>
+        <>
+          <Card className="mb-6 p-4 bg-white border border-slate-200 rounded-lg shadow-sm">
+            <Label className="text-slate-700 font-medium mb-2 block">Select Class</Label>
+            <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <SelectTrigger data-testid="class-selector" className="w-full bg-white border-slate-200">
+                <SelectValue placeholder="Select a class" />
+              </SelectTrigger>
+              <SelectContent>
+                {classes.map((cls) => (
+                  <SelectItem key={cls.id} value={cls.id}>{cls.name} ({cls.code})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Card>
+
+          {students.length > 0 ? (
+            <Card className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[680px]" data-testid="students-table">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Name</th>
+                      <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Roll Number</th>
+                      <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Attendance</th>
+                      <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((student, index) => (
+                      <tr key={student.id} data-testid={`student-row-${index}`} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-blue-50 rounded-full flex-shrink-0"><User className="h-3 w-3 text-blue-600" /></div>
+                            <span className="font-medium text-slate-900 text-sm truncate">{student.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-slate-900 font-mono text-xs">{student.roll_number}</td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-semibold text-slate-900">{(student.attendance?.percentage ?? 0).toFixed(2)}%</span>
+                            <span className="text-xs text-slate-500">{student.attendance?.status || 'Critical'}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(student)} className="text-slate-500 hover:text-blue-600 hover:bg-blue-50" data-testid={`edit-student-${index}`}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            {isSuperAdmin && (
+                              <Button variant="ghost" size="icon" onClick={() => setResetTarget(student)} className="text-slate-500 hover:text-amber-600 hover:bg-amber-50" title="Reset Password" aria-label="Reset Password" data-testid={`reset-student-${index}`}>
+                                <Key className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(student.id, student.name)} className="text-rose-600 hover:bg-rose-50" data-testid={`delete-student-${index}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-8 md:p-12 text-center bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="no-students-message">
+              <UsersIcon className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-slate-900 mb-2">No Students in This Class</h3>
+              <p className="text-slate-600 mb-6">Add students manually or share the join link</p>
+              <Button onClick={() => setDialogOpen(true)} className="bg-blue-900 hover:bg-blue-800 text-white"><Plus className="h-4 w-4 mr-2" /> Add Your First Student</Button>
+            </Card>
+          )}
+        </>
       )}
 
       {/* Edit Student Dialog */}
@@ -248,6 +295,34 @@ const Students = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Reset Password Dialog */}
+      <AlertDialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Student Password?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Temporary Password:<br />
+              <span className="font-semibold text-slate-900">{resetTarget?.roll_number}</span>
+              <br /><br />
+              The student can use this temporary password to log in.<br />
+              They will be required to create a new password immediately after login.
+              <br /><br />
+              Only Super Admins can perform this action.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetPassword}
+              disabled={resetting}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {resetting ? 'Resetting...' : 'Reset Password'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

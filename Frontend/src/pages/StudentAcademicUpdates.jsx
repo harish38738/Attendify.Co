@@ -94,8 +94,8 @@ const StudentAcademicUpdates = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900"></div>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900"></div>
         </div>
       ) : !hasAnyUpdates ? (
         <Card className="p-8 md:p-12 text-center bg-white border border-slate-200 rounded-lg shadow-sm max-w-2xl mx-auto mt-8">

@@ -1,20 +1,13 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import LoadingScreen from './LoadingScreen';
 
-const PrivateRoute = ({ children, allowedRoles = ['admin', 'student'] }) => {
+const PrivateRoute = ({ children, allowedRoles = ['admin', 'super_admin', 'student'] }) => {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-          <p className="mt-4 text-slate-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen fullScreen text="Checking authentication..." />;
+
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -22,6 +15,11 @@ const PrivateRoute = ({ children, allowedRoles = ['admin', 'student'] }) => {
 
   if (!allowedRoles.includes(user.role)) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Enforce password change for students
+  if (user.role === 'student' && user.must_change_password) {
+    return <Navigate to="/force-change-password" replace />;
   }
 
   return children;

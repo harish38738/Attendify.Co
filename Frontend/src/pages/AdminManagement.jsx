@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -33,7 +33,7 @@ const AdminManagement = () => {
   const [announcementClassId, setAnnouncementClassId] = useState('');
   const [publishing, setPublishing] = useState(false);
 
-  const fetchAdmins = async () => {
+  const fetchAdmins = useCallback(async () => {
     try {
       const res = await api.get('/api/auth/approved-admins');
       if (res.data.success) {
@@ -45,29 +45,32 @@ const AdminManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchAdmins();
-    fetchClasses();
   }, []);
 
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async () => {
     setClassesLoading(true);
     try {
       const res = await api.get('/api/classes');
       if (res.data.success) {
         setClasses(res.data.data.classes || []);
-        if (res.data.data.classes?.length > 0 && !announcementClassId) {
-          setAnnouncementClassId(res.data.data.classes[0].id);
-        }
+        setAnnouncementClassId((curr) => {
+          if (res.data.data.classes?.length > 0 && !curr) {
+            return res.data.data.classes[0].id;
+          }
+          return curr;
+        });
       }
     } catch (e) {
       toast.error('Failed to load classes');
     } finally {
       setClassesLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchAdmins();
+    fetchClasses();
+  }, [fetchAdmins, fetchClasses]);
 
   const handlePublishAnnouncement = async (e) => {
     e.preventDefault();
@@ -203,7 +206,7 @@ const AdminManagement = () => {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 min-[640px]:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="announcement-class" className="text-slate-700 font-medium">
               Choose class

@@ -1,34 +1,50 @@
 import React from 'react';
-import { GraduationCap } from 'lucide-react';
 
-const LoadingScreen = () => {
+const LoadingScreen = ({ fullScreen = false, text = "Loading..." }) => {
+  const containerClasses = fullScreen 
+    ? "fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900"
+    : "flex flex-col items-center justify-center w-full min-h-[60vh] bg-transparent px-4 text-center";
+
+  const textClasses = fullScreen ? "text-white" : "text-slate-900";
+  const subTextClasses = fullScreen ? "text-slate-400" : "text-slate-500";
+  const spinnerTrackClasses = fullScreen ? "border-slate-700" : "border-slate-200";
+  const spinnerHighlightClasses = "border-transparent border-t-blue-600";
+
   return (
     <div
-      className="fixed inset-0 flex flex-col items-center justify-center bg-slate-900"
+      className={containerClasses}
       data-testid="loading-screen"
     >
-      {/* Subtle radial glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(59,130,246,0.15)_0%,_transparent_70%)]" />
+      {/* Subtle radial glow only for full screen */}
+      {fullScreen && (
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(59,130,246,0.15)_0%,_transparent_70%)]" />
+      )}
 
-      <div className="relative z-10 flex flex-col items-center gap-6 animate-fade-in">
+      <div className="relative z-10 flex flex-col items-center gap-5 animate-fade-in">
         {/* Logo */}
-        <div className="flex items-center justify-center w-20 h-20 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/30">
-          <GraduationCap className="h-11 w-11 text-white" strokeWidth={1.8} />
-        </div>
+        <img
+          src={`${process.env.PUBLIC_URL}/attendify-logo.png`}
+          alt="Attendify logo"
+          className={`${fullScreen ? 'h-20 w-20 shadow-lg shadow-blue-600/30' : 'h-14 w-14 shadow-sm'} object-contain`}
+        />
 
         {/* App Name */}
-        <h1 className="text-3xl font-bold text-white tracking-tight">
-          Attendify
-        </h1>
+        {fullScreen && (
+          <h1 className={`text-3xl font-bold ${textClasses} tracking-tight`}>
+            Attendify
+          </h1>
+        )}
 
-        {/* Spinner */}
-        <div className="relative w-10 h-10">
-          <div className="absolute inset-0 rounded-full border-[3px] border-slate-700" />
-          <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-blue-500 animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          {/* Spinner */}
+          <div className={`${fullScreen ? 'w-10 h-10' : 'w-8 h-8'} relative`}>
+            <div className={`absolute inset-0 rounded-full border-[3px] ${spinnerTrackClasses}`} />
+            <div className={`absolute inset-0 rounded-full border-[3px] ${spinnerHighlightClasses} animate-spin`} />
+          </div>
+
+          {/* Loading text */}
+          <p className={`max-w-xs text-sm ${subTextClasses} tracking-wide font-medium`}>{text}</p>
         </div>
-
-        {/* Loading text */}
-        <p className="text-sm text-slate-400 tracking-wide">Loading...</p>
       </div>
     </div>
   );

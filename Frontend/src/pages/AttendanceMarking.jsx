@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../utils/api';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
@@ -11,7 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import { CalendarCheck, CheckCircle2, Search, Edit3 } from 'lucide-react';
+import { CalendarCheck, CheckCircle2, Search, Edit3, AlertTriangle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -28,29 +34,71 @@ const AttendanceMarking = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
   const [existingRecords, setExistingRecords] = useState(false);
+  const checkRequestRef = useRef(0);
+  // Confirmation dialog for edit mode
+  const [editConfirmOpen, setEditConfirmOpen] = useState(false);
+  // Cache class name for dialog
+  const [selectedClassName, setSelectedClassName] = useState('');
 
-  useEffect(() => {
-    fetchClasses();
+  const fetchClasses = useCallback(async () => {
+    try {
+      const response = await api.get('/api/classes');
+      if (response.data.success) {
+        const classList = response.data.data.classes;
+        setClasses(classList);
+        if (classList.length > 0) setSelectedClass(classList[0].id);
+      }
+    } catch (error) {
+      toast.error('Failed to fetch classes');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
-    if (selectedClass) {
-      const cls = classes.find((c) => c.id === selectedClass);
-      if (cls) setPeriodsPerDay(cls.periods_per_day || 6);
-      fetchStudents();
+  const fetchStudents = useCallback(async () => {
+    if (!selectedClass) return;
+    try {
+      const response = await api.get(`/api/classes/${selectedClass}/students`);
+      if (response.data.success) {
+        const studentsList = response.data.data.students;
+        setStudents(studentsList);
+        const init = {};
+        studentsList.forEach((s) => { init[s.id] = 'Present'; });
+        setAttendance(init);
+      }
+    } catch (error) {
+      toast.error('Failed to fetch students');
     }
-  }, [selectedClass, classes]);
+  }, [selectedClass]);
 
   const checkExisting = useCallback(async () => {
     if (!selectedClass || !selectedDate || !selectedPeriod) return;
+    const requestId = checkRequestRef.current + 1;
+    checkRequestRef.current = requestId;
+    const expectedClass = selectedClass;
+    const expectedDate = selectedDate;
+    const expectedPeriod = Number(selectedPeriod);
+    setExistingRecords(false);
+    setIsEditMode(false);
+    // Update display class name whenever class selection changes
+    const cls = classes.find((c) => c.id === selectedClass);
+    if (cls) setSelectedClassName(cls.name);
     try {
-      const res = await api.get(`/api/attendance/check?class_id=${selectedClass}&date=${selectedDate}&period_number=${selectedPeriod}`);
-      if (res.data.success && res.data.data.exists) {
+      const res = await api.get(
+        `/api/attendance/check?class_id=${encodeURIComponent(expectedClass)}&date=${encodeURIComponent(expectedDate)}&period_number=${expectedPeriod}`
+      );
+      if (requestId !== checkRequestRef.current) return;
+      const exactRecords = (res.data.data?.records || []).filter((record) => (
+        record.class_id === expectedClass
+        && record.date === expectedDate
+        && Number(record.period_number) === expectedPeriod
+      ));
+      if (res.data.success && exactRecords.length > 0) {
         setExistingRecords(true);
         setIsEditMode(true);
         // Pre-fill attendance from existing records
         const existing = {};
-        res.data.data.records.forEach((r) => {
+        exactRecords.forEach((r) => {
           existing[r.student_id] = r.status;
         });
         setAttendance(existing);
@@ -65,42 +113,23 @@ const AttendanceMarking = () => {
     } catch (error) {
       console.error('Check attendance error:', error);
     }
-  }, [selectedClass, selectedDate, selectedPeriod, students]);
+  }, [selectedClass, selectedDate, selectedPeriod, students, classes]);
+
+  useEffect(() => {
+    fetchClasses();
+  }, [fetchClasses]);
+
+  useEffect(() => {
+    if (selectedClass) {
+      const cls = classes.find((c) => c.id === selectedClass);
+      if (cls) setPeriodsPerDay(cls.periods_per_day || 6);
+      fetchStudents();
+    }
+  }, [selectedClass, classes, fetchStudents]);
 
   useEffect(() => {
     if (students.length > 0) checkExisting();
   }, [selectedDate, selectedPeriod, students, checkExisting]);
-
-  const fetchClasses = async () => {
-    try {
-      const response = await api.get('/api/classes');
-      if (response.data.success) {
-        const classList = response.data.data.classes;
-        setClasses(classList);
-        if (classList.length > 0) setSelectedClass(classList[0].id);
-      }
-    } catch (error) {
-      toast.error('Failed to fetch classes');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStudents = async () => {
-    if (!selectedClass) return;
-    try {
-      const response = await api.get(`/api/classes/${selectedClass}/students`);
-      if (response.data.success) {
-        const studentsList = response.data.data.students;
-        setStudents(studentsList);
-        const init = {};
-        studentsList.forEach((s) => { init[s.id] = 'Present'; });
-        setAttendance(init);
-      }
-    } catch (error) {
-      toast.error('Failed to fetch students');
-    }
-  };
 
   const cycleStatus = (studentId) => {
     const current = attendance[studentId] || 'Present';
@@ -124,8 +153,21 @@ const AttendanceMarking = () => {
     toast.success('All marked as Present');
   };
 
-  const handleSubmit = async () => {
+  // Called when user clicks the submit button
+  const requestSubmit = () => {
     if (!selectedClass || students.length === 0) return;
+    if (existingRecords) {
+      // Show confirmation dialog before sending edit
+      setEditConfirmOpen(true);
+    } else {
+      performSubmit();
+    }
+  };
+
+  const performSubmit = async () => {
+    setEditConfirmOpen(false);
+    if (!selectedClass || students.length === 0) return;
+    const shouldUpdate = existingRecords;
     setSubmitting(true);
     try {
       const records = students.map((s) => ({
@@ -141,7 +183,7 @@ const AttendanceMarking = () => {
       };
 
       let res;
-      if (isEditMode) {
+      if (shouldUpdate) {
         res = await api.put('/api/attendance', payload);
       } else {
         res = await api.post('/api/attendance', payload);
@@ -166,26 +208,6 @@ const AttendanceMarking = () => {
     return s.name.toLowerCase().includes(q) || s.roll_number.toLowerCase().includes(q);
   });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-      </div>
-    );
-  }
-
-  if (classes.length === 0) {
-    return (
-      <div className="p-4 md:p-8">
-        <Card className="p-8 md:p-12 text-center bg-white border border-slate-200 rounded-lg shadow-sm">
-          <CalendarCheck className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-slate-900 mb-2">No Classes Available</h3>
-          <p className="text-slate-600">Create a class and add students first</p>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 md:p-8" data-testid="attendance-marking-page">
       <div className="mb-6 md:mb-8">
@@ -193,8 +215,20 @@ const AttendanceMarking = () => {
         <p className="mt-2 text-sm md:text-base text-slate-600">Record student attendance by period</p>
       </div>
 
-      <Card className="p-4 md:p-6 mb-6 bg-white border border-slate-200 rounded-lg shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+      {loading ? (
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900"></div>
+        </div>
+      ) : classes.length === 0 ? (
+        <Card className="p-8 md:p-12 text-center bg-white border border-slate-200 rounded-lg shadow-sm">
+          <CalendarCheck className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-slate-900 mb-2">No Classes Available</h3>
+          <p className="text-slate-600">Create a class and add students first</p>
+        </Card>
+      ) : (
+        <>
+          <Card className="p-4 md:p-6 mb-6 bg-white border border-slate-200 rounded-lg shadow-sm">
+        <div className="grid grid-cols-1 min-[640px]:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <div>
             <Label className="text-slate-700 font-medium mb-2 block">Class</Label>
             <Select value={selectedClass} onValueChange={setSelectedClass}>
@@ -238,9 +272,9 @@ const AttendanceMarking = () => {
           </div>
         </div>
         {existingRecords && (
-          <div className="mt-4 flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800">
-            <Edit3 className="h-4 w-4 flex-shrink-0" />
-            <span className="text-sm">Attendance already exists for this period. You are now in edit mode.</span>
+          <div className="mt-4 flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-800">
+            <Edit3 className="h-4 w-4 flex-shrink-0 text-blue-700" />
+            <span className="text-sm font-medium">Attendance already exists for this period. You are now in edit mode.</span>
           </div>
         )}
       </Card>
@@ -287,16 +321,16 @@ const AttendanceMarking = () => {
                 ))}
               </div>
             </div>
-          </Card>
-
+            </Card>
+  
           <div className="flex justify-end">
             <Button
-              onClick={handleSubmit}
+              onClick={requestSubmit}
               disabled={submitting}
               data-testid="submit-attendance-button"
               className="bg-blue-900 hover:bg-blue-800 text-white font-medium px-8 w-full sm:w-auto"
             >
-              {submitting ? 'Submitting...' : isEditMode ? 'Update Attendance' : 'Submit Attendance'}
+              {submitting ? 'Submitting...' : existingRecords ? 'Update Attendance' : 'Submit Attendance'}
             </Button>
           </div>
         </>
@@ -307,7 +341,48 @@ const AttendanceMarking = () => {
           <p className="text-slate-600">Add students before marking attendance</p>
         </Card>
       )}
-    </div>
+      </>
+    )}
+
+    {/* Edit Attendance Confirmation Dialog */}
+    <Dialog open={editConfirmOpen} onOpenChange={setEditConfirmOpen}>
+      <DialogContent className="sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold text-amber-700 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" /> Update existing attendance?
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-4 space-y-3 text-sm text-slate-700">
+          <div className="grid grid-cols-[80px_1fr] gap-y-2">
+            <span className="font-semibold text-slate-500">Class:</span>
+            <span>{selectedClassName}</span>
+            <span className="font-semibold text-slate-500">Date:</span>
+            <span>{selectedDate}</span>
+            <span className="font-semibold text-slate-500">Period:</span>
+            <span>Period {selectedPeriod}</span>
+          </div>
+          <p className="pt-2 text-slate-600 border-t border-slate-100">
+            You are about to modify existing attendance records.
+            <br />
+            Are you sure you want to continue?
+          </p>
+        </div>
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={() => setEditConfirmOpen(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={performSubmit}
+            disabled={submitting}
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+            data-testid="confirm-update-attendance-button"
+          >
+            {submitting ? 'Updating...' : 'Update Attendance'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </div>
   );
 };
 

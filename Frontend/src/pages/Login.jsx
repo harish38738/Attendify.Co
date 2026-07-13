@@ -4,35 +4,68 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { GraduationCap, AlertCircle, User, Shield } from 'lucide-react';
+import { AlertCircle, Eye, User, Shield } from 'lucide-react';
 import { toast } from 'sonner';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import SegmentedControl from '../components/SegmentedControl';
 
-// REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-const GOOGLE_AUTH_URL = 'https://auth.emergentagent.com/';
-
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 const Login = () => {
   const [activeTab, setActiveTab] = useState('admin');
 
   const [studentRollNumber, setStudentRollNumber] = useState('');
+  const [studentPassword, setStudentPassword] = useState('');
+  const [showStudentPassword, setShowStudentPassword] = useState(false);
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentError, setStudentError] = useState('');
 
-  const { studentLogin } = useAuth();
+  const [adminError, setAdminError] = useState('');
+
+  const { studentLogin, adminGoogleLogin } = useAuth();
   const navigate = useNavigate();
 
-  const handleGoogleLogin = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + '/auth/callback';
-    window.location.href = `${GOOGLE_AUTH_URL}?redirect=${encodeURIComponent(redirectUrl)}`;
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setAdminError('');
+    try {
+      const response = await adminGoogleLogin(credentialResponse.credential);
+      if (response.success) {
+        toast.success('Admin login successful!');
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setAdminError(err.message || 'Access Denied');
+      toast.error('Admin login failed');
+    }
+  };
+
+  const handleGoogleError = () => {
+    setAdminError('Google Sign-In was unsuccessful. Try again.');
   };
 
   const handleStudentSubmit = async (e) => {
     e.preventDefault();
+    if (studentLoading) return;
+
+    const rollNumber = studentRollNumber.trim();
+    const password = studentPassword;
+
     setStudentError('');
+    if (!rollNumber || !password) {
+      setStudentError('Enter your roll number and password.');
+      return;
+    }
+    if (rollNumber.length < 2 || rollNumber.length > 32) {
+      setStudentError('Roll number must be 2 to 32 characters.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9._/-]+$/.test(rollNumber)) {
+      setStudentError('Roll number can include letters, numbers, dots, dashes, underscores, and slashes.');
+      return;
+    }
+
     setStudentLoading(true);
     try {
-      const response = await studentLogin(studentRollNumber);
+      const response = await studentLogin(rollNumber, password);
       if (response.success) {
         toast.success('Login successful!');
         navigate('/student/dashboard');
@@ -53,40 +86,33 @@ const Login = () => {
           {/* Logo */}
           <div className="text-center">
             <div className="flex justify-center mb-4">
-              <div className="flex items-center justify-center w-16 h-16 bg-blue-900 rounded-lg">
-                <GraduationCap className="h-10 w-10 text-white" />
-              </div>
+              <img
+                src={`${process.env.PUBLIC_URL}/attendify-logo.png`}
+                alt="Attendify logo"
+                className="h-16 w-16 object-contain"
+              />
             </div>
             <h1 className="text-4xl font-bold text-slate-900 font-heading tracking-tight">
               Attendify
             </h1>
-            <p className="mt-2 text-slate-600 font-body">Attendance Management System</p>
+            <p className="mt-2 text-slate-600 font-body">Your Smart Academic Companion</p>
             <p className="mt-1 text-xs text-slate-500">by HRK Technologies</p>
           </div>
 
-          {/* Login Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6 bg-slate-100 p-1 rounded-lg">
-              <TabsTrigger
-                value="admin"
-                data-testid="admin-tab"
-                className="flex items-center gap-2 data-[state=active]:bg-blue-900 data-[state=active]:text-white rounded-md transition-all font-medium text-slate-700"
-              >
-                <Shield className="h-4 w-4" />
-                <span>Admin</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="student"
-                data-testid="student-tab"
-                className="flex items-center gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-md transition-all font-medium text-slate-700"
-              >
-                <User className="h-4 w-4" />
-                <span>Student</span>
-              </TabsTrigger>
-            </TabsList>
+          <div className="w-full">
+            <SegmentedControl
+              value={activeTab}
+              onChange={setActiveTab}
+              aria-label="Login type"
+              className="mb-6"
+              options={[
+                { value: 'admin', label: 'Admin', icon: Shield, testId: 'admin-tab' },
+                { value: 'student', label: 'Student', icon: User, testId: 'student-tab' },
+              ]}
+            />
 
-            {/* Admin Login Tab — Google Auth */}
-            <TabsContent value="admin">
+            {/* Admin Login Tab */}
+            {activeTab === 'admin' && (
               <div className="space-y-6" data-testid="admin-login-section">
                 <div className="text-center">
                   <p className="text-sm text-slate-600 mb-6">
@@ -94,19 +120,27 @@ const Login = () => {
                   </p>
                 </div>
 
-                <Button
-                  onClick={handleGoogleLogin}
-                  data-testid="google-login-button"
-                  className="w-full h-12 bg-white hover:bg-slate-50 text-slate-700 font-medium rounded-lg border border-slate-300 shadow-sm transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-3"
-                >
-                  <svg className="h-5 w-5" viewBox="0 0 24 24">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                  </svg>
-                  Continue with Google
-                </Button>
+                <div className="flex justify-center">
+                  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                    <div className="w-full max-w-[340px]">
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={handleGoogleError}
+                        useOneTap
+                        theme="outline"
+                        size="large"
+                        width="340"
+                      />
+                    </div>
+                  </GoogleOAuthProvider>
+                </div>
+
+                {adminError && (
+                  <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 rounded-md text-rose-700">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm">{adminError}</span>
+                  </div>
+                )}
 
                 <div className="mt-4 p-4 bg-blue-50 rounded-md border border-blue-200">
                   <p className="text-xs font-medium text-blue-900 mb-1">Admin Access:</p>
@@ -115,28 +149,59 @@ const Login = () => {
                   </p>
                 </div>
               </div>
-            </TabsContent>
+            )}
 
             {/* Student Login Tab */}
-            <TabsContent value="student">
-              <form onSubmit={handleStudentSubmit} className="space-y-6" data-testid="student-login-form">
+            {activeTab === 'student' && (
+              <form onSubmit={handleStudentSubmit} className="space-y-5" data-testid="student-login-form">
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="student-roll" className="text-slate-700 font-medium">
+                    <Label htmlFor="student-roll" className="text-sm font-semibold text-slate-700">
                       Roll Number
                     </Label>
                     <Input
                       id="student-roll"
                       type="text"
                       value={studentRollNumber}
-                      onChange={(e) => setStudentRollNumber(e.target.value)}
+                      onChange={(e) => setStudentRollNumber(e.target.value.slice(0, 32))}
                       required
+                      minLength={2}
+                      maxLength={32}
+                      autoComplete="username"
+                      inputMode="text"
                       data-testid="student-roll-input"
-                      className="mt-2 h-11 bg-white border-slate-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 placeholder:text-slate-400"
+                      className="mt-2 h-12 rounded-lg bg-white border-slate-200 px-3.5 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 placeholder:text-slate-400"
                       placeholder="Enter your roll number (e.g., 21CS001)"
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="student-password" className="text-sm font-semibold text-slate-700">
+                      Password
+                    </Label>
+                    <div className="relative mt-2">
+                      <Input
+                        id="student-password"
+                        type={showStudentPassword ? 'text' : 'password'}
+                        value={studentPassword}
+                        onChange={(e) => setStudentPassword(e.target.value.slice(0, 128))}
+                        required
+                        maxLength={128}
+                        autoComplete="current-password"
+                        data-testid="student-password-input"
+                        className="h-12 rounded-lg bg-white border-slate-200 px-3.5 pr-12 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 placeholder:text-slate-400"
+                        placeholder="Enter your password"
+                      />
+                      <button
+                        type="button"
+                        aria-label={showStudentPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowStudentPassword((value) => !value)}
+                        className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </div>
                     <p className="text-xs text-slate-500 mt-2">
-                      Login with your roll number only. No password needed.
+                      Default password is your roll number.
                     </p>
                   </div>
                 </div>
@@ -153,22 +218,22 @@ const Login = () => {
 
                 <Button
                   type="submit"
-                  disabled={studentLoading}
+                  disabled={studentLoading || !studentRollNumber.trim() || !studentPassword}
                   data-testid="student-submit-button"
-                  className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md transition-all duration-200 active:scale-95"
+                  className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all duration-200 active:scale-95"
                 >
-                  {studentLoading ? 'Signing in...' : 'Sign In as Student'}
+                  {studentLoading ? 'Signing in...' : 'Sign in as student'}
                 </Button>
 
-                <div className="mt-4 p-4 bg-emerald-50 rounded-md border border-emerald-200">
+                <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                   <p className="text-xs font-medium text-emerald-900 mb-1">How to get access:</p>
                   <p className="text-xs text-emerald-700">
                     Ask your class admin for the join link, or use a roll number already registered.
                   </p>
                 </div>
               </form>
-            </TabsContent>
-          </Tabs>
+            )}
+          </div>
         </div>
       </div>
 

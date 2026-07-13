@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { downloadResource, previewResource, formatFileSize } from '../utils/resourceHelpers';
+import { downloadResource, formatFileSize } from '../utils/resourceHelpers';
+import {
+  isSupportedResourceFile,
+  RESOURCE_ACCEPT,
+  RESOURCE_UNSUPPORTED_MESSAGE,
+  SUPPORTED_RESOURCE_LABELS,
+} from '../utils/resourceConfig';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -35,6 +42,8 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 const Resources = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [subjects, setSubjects] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,10 +73,18 @@ const Resources = () => {
   const [replaceFile, setReplaceFile] = useState(null);
   const [replacing, setReplacing] = useState(false);
 
+  const supportedFileText = `Supported file types: ${SUPPORTED_RESOURCE_LABELS.join(', ')}`;
+
   useEffect(() => {
     fetchSubjects();
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (location.state?.selectedSubject) {
+      setSelectedSubject(location.state.selectedSubject);
+    }
+  }, [location.state]);
 
   const fetchSubjects = async () => {
     try {
@@ -165,6 +182,10 @@ const Resources = () => {
       toast.error('Please select a file');
       return;
     }
+    if (!isSupportedResourceFile(uploadFile)) {
+      toast.error(RESOURCE_UNSUPPORTED_MESSAGE);
+      return;
+    }
     setUploading(true);
     try {
       const formData = new FormData();
@@ -212,6 +233,10 @@ const Resources = () => {
     e.preventDefault();
     if (!replaceFile) {
       toast.error('Please select a file');
+      return;
+    }
+    if (!isSupportedResourceFile(replaceFile)) {
+      toast.error(RESOURCE_UNSUPPORTED_MESSAGE);
       return;
     }
     setReplacing(true);
@@ -263,11 +288,34 @@ const Resources = () => {
   };
 
   const handlePreview = async (resource) => {
-    try {
-      await previewResource(resource.id);
-    } catch {
-      toast.error('Failed to preview resource');
+    navigate(`/resources/${resource.id}`, {
+      state: {
+        from: '/resources',
+        selectedSubject,
+      },
+    });
+  };
+
+  const handleUploadFileChange = (event) => {
+    const nextFile = event.target.files?.[0] || null;
+    if (nextFile && !isSupportedResourceFile(nextFile)) {
+      toast.error(RESOURCE_UNSUPPORTED_MESSAGE);
+      event.target.value = '';
+      setUploadFile(null);
+      return;
     }
+    setUploadFile(nextFile);
+  };
+
+  const handleReplaceFileChange = (event) => {
+    const nextFile = event.target.files?.[0] || null;
+    if (nextFile && !isSupportedResourceFile(nextFile)) {
+      toast.error(RESOURCE_UNSUPPORTED_MESSAGE);
+      event.target.value = '';
+      setReplaceFile(null);
+      return;
+    }
+    setReplaceFile(nextFile);
   };
 
   if (loading) {
@@ -308,7 +356,7 @@ const Resources = () => {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <div className="grid gap-3 mb-6 min-[640px]:grid-cols-[1fr_14rem]">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
@@ -320,7 +368,7 @@ const Resources = () => {
             />
           </div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full md:w-56 bg-white border-slate-200">
+            <SelectTrigger className="w-full bg-white border-slate-200">
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
@@ -339,7 +387,7 @@ const Resources = () => {
         ) : resources.length > 0 ? (
           <Card className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full" data-testid="resources-table">
+              <table className="w-full min-w-[760px]" data-testid="resources-table">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
                     <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase">Name</th>
@@ -370,11 +418,9 @@ const Resources = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-end gap-1">
-                          {resource.previewable && (
-                            <Button variant="ghost" size="icon" onClick={() => handlePreview(resource)} title="Preview">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button variant="ghost" size="icon" onClick={() => handlePreview(resource)} title="View">
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDownload(resource)} title="Download">
                             <Download className="h-4 w-4" />
                           </Button>
@@ -432,7 +478,8 @@ const Resources = () => {
               </div>
               <div>
                 <Label htmlFor="upload-file">File</Label>
-                <Input id="upload-file" type="file" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} required className="mt-2" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.zip" />
+                <p className="mt-1 text-xs text-slate-500">{supportedFileText}</p>
+                <Input id="upload-file" type="file" onChange={handleUploadFileChange} required className="mt-2" accept={RESOURCE_ACCEPT} />
               </div>
               <Button type="submit" disabled={uploading || !uploadCategory} className="w-full">
                 {uploading ? 'Uploading...' : 'Upload'}
@@ -480,7 +527,8 @@ const Resources = () => {
               <p className="text-sm text-slate-600">Replace file for &quot;{replaceTarget?.displayName}&quot;</p>
               <div>
                 <Label htmlFor="replace-file">New File</Label>
-                <Input id="replace-file" type="file" onChange={(e) => setReplaceFile(e.target.files?.[0] || null)} required className="mt-2" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.zip" />
+                <p className="mt-1 text-xs text-slate-500">{supportedFileText}</p>
+                <Input id="replace-file" type="file" onChange={handleReplaceFileChange} required className="mt-2" accept={RESOURCE_ACCEPT} />
               </div>
               <Button type="submit" disabled={replacing} className="w-full">
                 {replacing ? 'Replacing...' : 'Replace File'}
@@ -499,16 +547,20 @@ const Resources = () => {
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 font-heading tracking-tight">Resources</h1>
           <p className="mt-2 text-sm md:text-base text-slate-600">Manage subjects and study materials</p>
         </div>
-        <Button onClick={() => setSubjectDialogOpen(true)} data-testid="create-subject-button">
+        <Button onClick={() => setSubjectDialogOpen(true)} data-testid="create-subject-button" disabled={loading}>
           <Plus className="h-4 w-4 mr-2" />
           Add Subject
         </Button>
       </div>
 
-      {subjects.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900"></div>
+        </div>
+      ) : subjects.length > 0 ? (
+        <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-4">
           {subjects.map((subject) => (
-            <Card key={subject.id} className="p-5 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            <Card key={subject.id} className="h-full p-5 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-3">
                 <button type="button" onClick={() => setSelectedSubject(subject)} className="flex-1 text-left">
                   <div className="flex items-center gap-3 mb-2">

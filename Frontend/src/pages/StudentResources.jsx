@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { downloadResource, previewResource, formatFileSize } from '../utils/resourceHelpers';
+import { downloadResource, formatFileSize } from '../utils/resourceHelpers';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
+import LoadingScreen from '../components/LoadingScreen';
 import {
   Select,
   SelectContent,
@@ -24,6 +26,8 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 const StudentResources = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [subjects, setSubjects] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +41,12 @@ const StudentResources = () => {
     fetchSubjects();
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (location.state?.selectedSubject) {
+      setSelectedSubject(location.state.selectedSubject);
+    }
+  }, [location.state]);
 
   const fetchSubjects = async () => {
     try {
@@ -88,20 +98,13 @@ const StudentResources = () => {
   };
 
   const handlePreview = async (resource) => {
-    try {
-      await previewResource(resource.id);
-    } catch {
-      toast.error('Failed to preview resource');
-    }
+    navigate(`/student/resources/${resource.id}`, {
+      state: {
+        from: '/student/resources',
+        selectedSubject,
+      },
+    });
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto" />
-      </div>
-    );
-  }
 
   if (selectedSubject) {
     return (
@@ -119,7 +122,7 @@ const StudentResources = () => {
           <p className="mt-2 text-sm md:text-base text-slate-600">Browse and download study materials</p>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <div className="grid gap-3 mb-6 min-[640px]:grid-cols-[1fr_14rem]">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
@@ -131,7 +134,7 @@ const StudentResources = () => {
             />
           </div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full md:w-56 bg-white border-slate-200">
+            <SelectTrigger className="w-full bg-white border-slate-200">
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
@@ -144,13 +147,11 @@ const StudentResources = () => {
         </div>
 
         {resourcesLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900" />
-          </div>
+          <LoadingScreen text="Loading resources..." fullScreen={false} />
         ) : resources.length > 0 ? (
           <Card className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full" data-testid="student-resources-table">
+              <table className="w-full min-w-[700px]" data-testid="student-resources-table">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
                     <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase">Name</th>
@@ -179,11 +180,9 @@ const StudentResources = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-end gap-1">
-                          {resource.previewable && (
-                            <Button variant="ghost" size="icon" onClick={() => handlePreview(resource)} title="Preview">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button variant="ghost" size="icon" onClick={() => handlePreview(resource)} title="View">
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDownload(resource)} title="Download">
                             <Download className="h-4 w-4" />
                           </Button>
@@ -213,10 +212,14 @@ const StudentResources = () => {
         <p className="mt-2 text-sm md:text-base text-slate-600">Browse study materials by subject</p>
       </div>
 
-      {subjects.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900"></div>
+        </div>
+      ) : subjects.length > 0 ? (
+        <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-4">
           {subjects.map((subject) => (
-            <Card key={subject.id} className="p-5 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            <Card key={subject.id} className="h-full p-5 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
               <button type="button" onClick={() => setSelectedSubject(subject)} className="w-full text-left">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-blue-50 rounded-lg">

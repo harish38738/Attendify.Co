@@ -9,15 +9,20 @@ import sys
 
 BASE_URL = "http://127.0.0.1:8000"
 
-def test_backend_connectivity():
+import pytest
+
+def _check_backend_connectivity():
     """Test if backend is reachable"""
     try:
-        r = requests.get(f"{BASE_URL}/api/auth/me", timeout=5)
-        print(f"✓ Backend reachable: {r.status_code}")
+        r = requests.get(f"{BASE_URL}/api/auth/me", timeout=1)
         return True
     except Exception as e:
-        print(f"✗ Backend not reachable: {e}")
         return False
+
+pytestmark = pytest.mark.skipif(
+    not _check_backend_connectivity(),
+    reason="Local backend server is not running."
+)
 
 def test_student_login_and_dashboard():
     """Test student login and dashboard with session persistence"""
@@ -32,7 +37,7 @@ def test_student_login_and_dashboard():
     print(f"\n1. Attempting student login with roll number: {test_roll}")
     login_resp = session.post(
         f"{BASE_URL}/api/auth/student-login",
-        json={"roll_number": test_roll},
+        json={"roll_number": test_roll, "password": test_roll},
         timeout=10
     )
     print(f"   Status: {login_resp.status_code}")
@@ -42,14 +47,14 @@ def test_student_login_and_dashboard():
         print(f"   Response: {json.dumps(data, indent=2)}")
         
         # Check if Set-Cookie header is present
-        print(f"\n2. Checking for session_id cookie in response headers...")
+        print(f"\n2. Checking for auth_token cookie in response headers...")
         cookies = session.cookies
         print(f"   Cookies in session: {dict(cookies)}")
         
-        if 'session_id' in cookies:
-            print(f"   ✓ session_id cookie received: {cookies['session_id'][:20]}...")
+        if 'auth_token' in cookies:
+            print(f"   ✓ auth_token cookie received: {cookies['auth_token'][:20]}...")
         else:
-            print(f"   ⚠ No session_id cookie in session (may be in Set-Cookie header)")
+            print(f"   ⚠ No auth_token cookie in session (may be in Set-Cookie header)")
             print(f"   Headers: {login_resp.headers}")
         
         print(f"\n3. Testing dashboard access with session cookie...")
@@ -83,7 +88,7 @@ if __name__ == "__main__":
     print("Testing Cookie Secure Fix for Local HTTP Development")
     print("=" * 50)
     
-    if not test_backend_connectivity():
+    if not _check_backend_connectivity():
         print("\n⚠ Backend not running. Start with: python server.py")
         sys.exit(1)
     

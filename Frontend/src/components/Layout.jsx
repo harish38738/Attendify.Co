@@ -7,15 +7,16 @@ import {
   BookOpen,
   Users,
   CalendarCheck,
-  BarChart3,
-  ShieldCheck,
   LogOut,
-  GraduationCap,
   Menu,
   X,
   History,
   Bell,
   LibraryBig,
+  Clock3,
+  Megaphone,
+  User,
+  BookMarked,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -34,26 +35,29 @@ const Layout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin'] },
-    { name: 'Classes', href: '/classes', icon: BookOpen, roles: ['admin'] },
-    { name: 'Students', href: '/students', icon: Users, roles: ['admin'] },
-    { name: 'Mark Attendance', href: '/attendance', icon: CalendarCheck, roles: ['admin'] },
-    { name: 'Reports', href: '/reports', icon: BarChart3, roles: ['admin'] },
-    { name: 'Resources', href: '/resources', icon: LibraryBig, roles: ['admin'] },
-    { name: 'Admins', href: '/admins', icon: ShieldCheck, roles: ['admin'] },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'super_admin'] },
+    { name: 'Classes & Students', href: '/classes-students', icon: Users, roles: ['admin', 'super_admin'] },
+    { name: 'Attendance', href: '/attendance', icon: CalendarCheck, roles: ['admin', 'super_admin'] },
+    { name: 'Resources', href: '/resources', icon: LibraryBig, roles: ['admin', 'super_admin'] },
+    { name: 'Timetable', href: '/timetable', icon: Clock3, roles: ['admin', 'super_admin'] },
+    { name: 'Updates', href: '/updates', icon: Megaphone, roles: ['admin', 'super_admin'] },
   ];
 
   const studentNavigation = [
-    { name: 'My Dashboard', href: '/student/dashboard', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/student/dashboard', icon: LayoutDashboard },
     { name: 'Classmates', href: '/student/classmates', icon: Users },
     { name: 'Resources', href: '/student/resources', icon: BookOpen },
     { name: 'Attendance History', href: '/student/history', icon: History },
-    { name: 'Profile', href: '/student/profile', icon: ShieldCheck },
+    { name: 'Academic Updates', href: '/student/academic-updates', icon: BookMarked },
+    { name: 'Profile', href: '/student/profile', icon: User },
   ];
 
-  const navItems = user?.role === 'student' ? studentNavigation : navigation;
+  const navItems = user?.role === 'student'
+    ? studentNavigation
+    : navigation.filter((item) => item.roles.includes(user?.role));
 
   const handleLogout = async () => {
     try {
@@ -79,6 +83,7 @@ const Layout = () => {
 
   const markNotificationRead = async (notification) => {
     if (notification.read) {
+      if (notification.link) navigate(notification.link);
       return;
     }
     try {
@@ -111,29 +116,39 @@ const Layout = () => {
   };
 
   useEffect(() => {
-    if (user?.role === 'student') {
-      fetchNotifications();
-    } else {
+    if (user?.role !== 'student') {
       setNotifications([]);
       setUnreadCount(0);
+      return undefined;
     }
+    fetchNotifications();
+    const interval = window.setInterval(fetchNotifications, 30000);
+    const refresh = () => fetchNotifications();
+    window.addEventListener('attendify:notifications-changed', refresh);
+    return () => { window.clearInterval(interval); window.removeEventListener('attendify:notifications-changed', refresh); };
   }, [user]);
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-screen min-w-0 bg-slate-50">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:w-64 bg-slate-900 text-white flex-col" data-testid="sidebar">
+      <aside className="hidden md:flex md:h-screen md:w-64 bg-slate-900 text-white flex-col overflow-hidden" data-testid="sidebar">
         {/* Logo */}
-        <div className="flex flex-col px-6 py-8 border-b border-slate-800">
+        <div className="shrink-0 flex flex-col px-6 py-6 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <GraduationCap className="h-8 w-8 text-blue-400" />
-            <span className="text-xl font-bold font-heading">Attendify</span>
+            <img
+              src={`${process.env.PUBLIC_URL}/attendify-logo.png`}
+              alt="Attendify logo"
+              className="h-12 w-12 shrink-0 object-contain"
+            />
+            <div className="flex min-w-0 flex-col justify-center">
+              <span className="text-xl font-bold font-heading leading-tight">Attendify</span>
+              <p className="text-xs text-slate-400 leading-tight">by HRK Technologies</p>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 mt-2">by HRK Technologies</p>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="min-h-0 flex-1 overflow-y-auto px-4 py-5 space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.href;
@@ -142,7 +157,7 @@ const Layout = () => {
                 key={item.name}
                 to={item.href}
                 data-testid={`nav-${item.name.toLowerCase().replace(' ', '-')}`}
-                className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 ${
+                className={`flex min-h-[44px] items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 ${
                   isActive
                     ? 'bg-blue-800/50 text-white border-r-4 border-blue-400 translate-x-1'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -156,15 +171,34 @@ const Layout = () => {
         </nav>
 
         {/* User Info & Logout */}
-        <div className="p-4 border-t border-slate-800">
-          <div className="px-4 py-3 bg-slate-800 rounded-md mb-2">
-            <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-            <p className="text-xs text-slate-400 truncate">{user?.email || user?.roll_number}</p>
+        <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-900">
+          <div
+            onClick={() => navigate(isAdmin ? '/profile' : '/student/profile')}
+            className="px-4 py-3 bg-slate-800 hover:bg-slate-700/50 cursor-pointer rounded-md mb-2 transition-colors duration-200 flex min-h-[44px] items-center gap-3"
+            title="View Profile"
+            data-testid="profile-card"
+          >
+            {isAdmin ? (
+              <>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-base shrink-0">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'A')}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+                  <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                </div>
+              </>
+            ) : (
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+                <p className="text-xs text-slate-400 truncate">{user?.email || user?.roll_number}</p>
+              </div>
+            )}
           </div>
           <button
             onClick={handleLogout}
             data-testid="logout-button"
-            className="flex items-center gap-3 px-4 py-3 rounded-md text-slate-300 hover:bg-slate-800 hover:text-white w-full transition-colors duration-200"
+            className="flex min-h-[44px] items-center gap-3 px-4 py-3 rounded-md text-slate-300 hover:bg-slate-800 hover:text-white w-full transition-colors duration-200"
           >
             <LogOut className="h-5 w-5" strokeWidth={1.5} />
             <span className="font-medium">Logout</span>
@@ -182,22 +216,29 @@ const Layout = () => {
 
       {/* Mobile Sidebar Drawer */}
       <aside
-        className={`md:hidden fixed top-0 left-0 bottom-0 w-64 bg-slate-900 text-white flex flex-col z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`md:hidden fixed top-0 left-0 bottom-0 w-64 bg-slate-900 text-white flex flex-col z-50 transform transition-transform duration-300 ease-in-out overflow-hidden ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Logo & Close Button */}
-        <div className="flex items-center justify-between px-6 py-8 border-b border-slate-800">
-          <div className="flex flex-col">
+        <div className="shrink-0 flex items-center justify-between px-6 py-6 border-b border-slate-800">
+          <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <GraduationCap className="h-8 w-8 text-blue-400" />
-              <span className="text-xl font-bold font-heading">Attendify</span>
+              <img
+                src={`${process.env.PUBLIC_URL}/attendify-logo.png`}
+                alt="Attendify logo"
+                className="h-12 w-12 shrink-0 object-contain"
+              />
+              <div className="flex min-w-0 flex-col justify-center">
+                <span className="text-xl font-bold font-heading leading-tight">Attendify</span>
+                <p className="text-xs text-slate-400 leading-tight">by HRK Technologies</p>
+              </div>
             </div>
-            <p className="text-xs text-slate-400 mt-1 ml-11">by HRK Technologies</p>
           </div>
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="p-2 rounded-md hover:bg-slate-800 transition-colors"
+            aria-label="Close navigation menu"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-slate-800 transition-colors"
             data-testid="mobile-menu-close"
           >
             <X className="h-6 w-6" />
@@ -205,7 +246,7 @@ const Layout = () => {
         </div>
 
         {/* Mobile Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="min-h-0 flex-1 overflow-y-auto px-4 py-5 space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.href;
@@ -214,7 +255,7 @@ const Layout = () => {
                 key={item.name}
                 onClick={() => handleNavClick(item.href)}
                 data-testid={`mobile-nav-${item.name.toLowerCase().replace(' ', '-')}`}
-                className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 w-full text-left ${
+                className={`flex min-h-[44px] items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 w-full text-left ${
                   isActive
                     ? 'bg-blue-800/50 text-white border-r-4 border-blue-400'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -228,15 +269,34 @@ const Layout = () => {
         </nav>
 
         {/* Mobile User Info & Logout */}
-        <div className="p-4 border-t border-slate-800">
-          <div className="px-4 py-3 bg-slate-800 rounded-md mb-2">
-            <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-            <p className="text-xs text-slate-400 truncate">{user?.email || user?.roll_number}</p>
+        <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-900">
+          <div
+            onClick={() => navigate(isAdmin ? '/profile' : '/student/profile')}
+            className="px-4 py-3 bg-slate-800 hover:bg-slate-700/50 cursor-pointer rounded-md mb-2 transition-colors duration-200 flex min-h-[44px] items-center gap-3"
+            title="View Profile"
+            data-testid="mobile-profile-card"
+          >
+            {isAdmin ? (
+              <>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-base shrink-0">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'A')}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+                  <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                </div>
+              </>
+            ) : (
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+                <p className="text-xs text-slate-400 truncate">{user?.email || user?.roll_number}</p>
+              </div>
+            )}
           </div>
           <button
             onClick={handleLogout}
             data-testid="mobile-logout-button"
-            className="flex items-center gap-3 px-4 py-3 rounded-md text-slate-300 hover:bg-slate-800 hover:text-white w-full transition-colors duration-200"
+            className="flex min-h-[44px] items-center gap-3 px-4 py-3 rounded-md text-slate-300 hover:bg-slate-800 hover:text-white w-full transition-colors duration-200"
           >
             <LogOut className="h-5 w-5" strokeWidth={1.5} />
             <span className="font-medium">Logout</span>
@@ -245,27 +305,33 @@ const Layout = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="min-w-0 flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header */}
         <header className="md:hidden bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-2 rounded-md hover:bg-slate-100 transition-colors"
+            aria-label="Open navigation menu"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-slate-100 transition-colors"
             data-testid="mobile-menu-button"
           >
             <Menu className="h-6 w-6 text-slate-700" />
           </button>
           <div className="flex flex-col items-center">
             <div className="flex items-center gap-2">
-              <GraduationCap className="h-6 w-6 text-blue-900" />
-              <span className="text-lg font-bold font-heading text-slate-900">Attendify</span>
+              <img
+                src={`${process.env.PUBLIC_URL}/attendify-logo.png`}
+                alt="Attendify logo"
+                className="h-8 w-8 shrink-0 object-contain"
+              />
+              <span className="text-lg font-bold font-heading leading-tight text-slate-900">Attendify</span>
             </div>
-            <p className="text-[10px] text-slate-500">by HRK Technologies</p>
+            <p className="mt-1.5 text-[10px] leading-tight text-slate-500">by HRK Technologies</p>
           </div>
           {user?.role === 'student' ? (
             <button
               onClick={() => navigate('/student/notifications')}
-              className="relative p-2 rounded-md hover:bg-slate-100 transition-colors"
+              aria-label="Open notifications"
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-slate-100 transition-colors"
               data-testid="mobile-notifications-button"
             >
               <Bell className="h-6 w-6 text-slate-700" />
@@ -280,6 +346,8 @@ const Layout = () => {
           )}
         </header>
 
+
+
         {/* Student notification bar */}
         {user?.role === 'student' && (
           <header className="hidden md:flex items-center justify-end gap-2 px-6 py-4 border-b border-slate-200 bg-white">
@@ -287,7 +355,8 @@ const Layout = () => {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="relative inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                  aria-label="Open notifications"
+                  className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
                   data-testid="notification-trigger"
                 >
                   <Bell className="h-5 w-5" />
@@ -298,7 +367,7 @@ const Layout = () => {
                   )}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent sideOffset={8} className="w-96 max-w-full">
+              <DropdownMenuContent sideOffset={8} className="w-[min(calc(100vw-2rem),24rem)]">
                 <div className="flex items-center justify-between px-3 py-2">
                   <DropdownMenuLabel className="text-sm font-semibold">Notifications</DropdownMenuLabel>
                   <button
@@ -338,7 +407,7 @@ const Layout = () => {
         )}
 
         {/* Page Content */}
-        <div className="flex-1 overflow-auto">
+        <div className="min-w-0 flex-1 overflow-auto">
           <Outlet />
         </div>
       </main>

@@ -26,14 +26,6 @@ const StudentClassmates = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 md:p-8" data-testid="student-classmates-page">
       <div className="mb-6 md:mb-8">
@@ -43,10 +35,14 @@ const StudentClassmates = () => {
         </p>
       </div>
 
-      {classmates.length > 0 ? (
+      {loading ? (
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900"></div>
+        </div>
+      ) : classmates.length > 0 ? (
         <Card className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full" data-testid="classmates-table">
+            <table className="w-full min-w-[420px]" data-testid="classmates-table">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Name</th>

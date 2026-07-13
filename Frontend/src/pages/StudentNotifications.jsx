@@ -51,8 +51,8 @@ const StudentNotifications = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900"></div>
         </div>
       ) : error ? (
         <Card className="p-6 bg-white border border-slate-200 rounded-lg shadow-sm">

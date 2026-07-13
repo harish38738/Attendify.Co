@@ -93,7 +93,7 @@ Attendify/
 
 ## 5. Quick Start (Local Developer Setup)
 
-For detailed deployment parameters, refer to the [Installation Guide](file:///c:/Users/acer/Documents/Attendify_Workspace/frontend/public/Harish's%20Creation/Attendify/Frontend/public/Attendify-vs%20code/docs/09_installation_guide.md).
+For detailed deployment parameters, refer to the [Installation Guide](file:///c:/Users/acer/Documents/Attendify_Workspace/frontend/public/Harish's%20Creation/Attendify/Frontend/public/Attendify-vs%20code/docs/08_installation_guide.md).
 
 ### A. Run Backend
 1. Enter the `Backened/` directory.
@@ -126,7 +126,9 @@ For detailed deployment parameters, refer to the [Installation Guide](file:///c:
 
 ## 6. Documentation Suite Index
 
-Below is the directory of all 20 system, engineering, operations, and manual documents for Attendify V1.
+Below is the directory of the 20-part Core Documentation Suite and the Supplementary Release Artifacts for Attendify V1.0.0.
+
+### Core Documentation Suite (20 Documents)
 
 | Document # | Document Title | Description | File Path |
 |:---:|---|---|---|
@@ -149,4 +151,10 @@ Below is the directory of all 20 system, engineering, operations, and manual doc
 | **17** | **Known Limitations** | Architectural boundaries and resource bounds of the V1 core | [17_known_limitations.md](file:///c:/Users/acer/Documents/Attendify_Workspace/frontend/public/Harish's%20Creation/Attendify/Frontend/public/Attendify-vs%20code/docs/17_known_limitations.md) |
 | **18** | **Maintenance Guide** | Daily database backup scripts, recovery plans, and log management | [18_maintenance_guide.md](file:///c:/Users/acer/Documents/Attendify_Workspace/frontend/public/Harish's%20Creation/Attendify/Frontend/public/Attendify-vs%20code/docs/18_maintenance_guide.md) |
 | **19** | **V2 Backlog** | Roadmap for high-availability scaling, Redis cache, and S3 | [19_v2_backlog.md](file:///c:/Users/acer/Documents/Attendify_Workspace/frontend/public/Harish's%20Creation/Attendify/Frontend/public/Attendify-vs%20code/docs/19_v2_backlog.md) |
-| **20** | **Project README** | This document | [README.md](file:///c:/Users/acer/Documents/Attendify_Workspace/frontend/public/Harish's%20Creation/Attendify/Frontend/public/Attendify-vs%20code/README.md) |
+| **20** | **Project README (Suite Index)** | Repository index and system overview (this document) | [README.md](file:///c:/Users/acer/Documents/Attendify_Workspace/frontend/public/Harish's%20Creation/Attendify/Frontend/public/Attendify-vs%20code/README.md) |
+
+### Supplementary Release Artifacts (1 Document)
+
+| Document # | Document Title | Description | File Path |
+|:---:|---|---|---|
+| **21** | **Release Certificate (v1.0.0)** | Official engineering release record, metrics, and verification summary | [20_release_certificate.md](file:///c:/Users/acer/Documents/Attendify_Workspace/frontend/public/Harish's%20Creation/Attendify/Frontend/public/Attendify-vs%20code/docs/20_release_certificate.md) |

@@ -89,7 +89,7 @@ Cookie-based session validation manages authentication across the portals:
 [Google OAuth Portal]         [Roll Number Form]
           │                           │
           ▼ (Callback verification)   ▼ (Decrypt hash)
-  POST /google-session        POST /student-login
+  POST /google-admin          POST /student-login
           │                           │
           └─────────────┬─────────────┘
                         ▼

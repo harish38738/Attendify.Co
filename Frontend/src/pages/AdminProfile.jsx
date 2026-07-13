@@ -184,8 +184,8 @@ const AdminProfile = () => {
       </div>
 
       {(loading || !profile) ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900"></div>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900"></div>
         </div>
       ) : (
         <div className="grid gap-4 min-[860px]:grid-cols-[minmax(280px,1fr)_1.5fr] md:gap-6 max-w-7xl mx-auto">

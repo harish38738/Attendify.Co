@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card } from '../components/ui/card';
-import { GraduationCap, AlertCircle, CheckCircle2, Users } from 'lucide-react';
+import LoadingScreen from '../components/LoadingScreen';
+import { AlertCircle, CheckCircle2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 const JoinClass = () => {
@@ -17,13 +18,9 @@ const JoinClass = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [formData, setFormData] = useState({ name: '', roll_number: '' });
+  const [formData, setFormData] = useState({ name: '', roll_number: '', password: '', confirm_password: '' });
 
-  useEffect(() => {
-    fetchClassInfo();
-  }, [joinCode]);
-
-  const fetchClassInfo = async () => {
+  const fetchClassInfo = useCallback(async () => {
     try {
       const response = await api.get(`/api/classes/join-info/${joinCode}`);
       if (response.data.success) {
@@ -36,17 +33,54 @@ const JoinClass = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [joinCode]);
+
+  useEffect(() => {
+    fetchClassInfo();
+  }, [fetchClassInfo]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+
+    const name = formData.name.trim().replace(/\s+/g, ' ');
+    const rollNumber = formData.roll_number.trim();
+    const password = formData.password;
+    const confirmPassword = formData.confirm_password;
+
     setError('');
+    if (name.length < 2 || name.length > 80) {
+      setError('Full name must be 2 to 80 characters.');
+      return;
+    }
+    if (!/^[a-zA-Z .'-]+$/.test(name)) {
+      setError('Full name can include letters, spaces, apostrophes, periods, and hyphens.');
+      return;
+    }
+    if (rollNumber.length < 2 || rollNumber.length > 32) {
+      setError('Roll number must be 2 to 32 characters.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9._/-]+$/.test(rollNumber)) {
+      setError('Roll number can include letters, numbers, dots, dashes, underscores, and slashes.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (password.length < 6 || password.length > 128) {
+      setError('Password must be 6 to 128 characters long');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const response = await api.post('/api/classes/join', {
         join_code: joinCode,
-        name: formData.name,
-        roll_number: formData.roll_number,
+        name,
+        roll_number: rollNumber,
+        password,
       });
       if (response.data.success) {
         setSuccess(true);
@@ -62,11 +96,7 @@ const JoinClass = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-      </div>
-    );
+    return <LoadingScreen fullScreen text="Loading class info..." />;
   }
 
   if (error && !classInfo) {
@@ -95,8 +125,7 @@ const JoinClass = () => {
           <p className="text-slate-600 mb-2">You have been added to <strong>{classInfo.class_name}</strong></p>
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6 mt-4">
             <p className="text-sm font-medium text-blue-900 mb-2">How to Login:</p>
-            <p className="text-sm text-blue-700">Use your roll number <strong>{formData.roll_number.toUpperCase()}</strong> on the Student login tab.</p>
-            <p className="text-xs text-blue-600 mt-2">No password needed!</p>
+            <p className="text-sm text-blue-700">Use your roll number <strong>{formData.roll_number.toUpperCase()}</strong> and password to log in on the Student tab.</p>
           </div>
           <Button onClick={() => navigate('/login')} className="w-full bg-blue-900 hover:bg-blue-800 text-white" data-testid="go-to-login-button">
             Go to Login
@@ -112,9 +141,11 @@ const JoinClass = () => {
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
             <div className="flex justify-center mb-4">
-              <div className="flex items-center justify-center w-16 h-16 bg-blue-900 rounded-lg">
-                <GraduationCap className="h-10 w-10 text-white" />
-              </div>
+              <img
+                src={`${process.env.PUBLIC_URL}/attendify-logo.png`}
+                alt="Attendify logo"
+                className="h-20 w-20 object-contain drop-shadow-md"
+              />
             </div>
             <h1 className="text-4xl font-bold text-slate-900 font-heading tracking-tight">Join Class</h1>
             <p className="mt-2 text-slate-600">Attendify by HRK Technologies</p>
@@ -143,8 +174,11 @@ const JoinClass = () => {
                   id="name"
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value.slice(0, 80) })}
                   required
+                  minLength={2}
+                  maxLength={80}
+                  autoComplete="name"
                   data-testid="join-name-input"
                   className="mt-2 h-11 bg-white border-slate-200 placeholder:text-slate-400"
                   placeholder="Enter your full name"
@@ -156,13 +190,47 @@ const JoinClass = () => {
                   id="roll_number"
                   type="text"
                   value={formData.roll_number}
-                  onChange={(e) => setFormData({ ...formData, roll_number: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, roll_number: e.target.value.slice(0, 32) })}
                   required
+                  minLength={2}
+                  maxLength={32}
+                  autoComplete="username"
                   data-testid="join-roll-input"
                   className="mt-2 h-11 bg-white border-slate-200 placeholder:text-slate-400"
                   placeholder="Enter your roll number"
                 />
-                <p className="text-xs text-slate-500 mt-1">This will be your login credential (no password needed)</p>
+              </div>
+              <div>
+                <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value.slice(0, 128) })}
+                  required
+                  minLength={6}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  data-testid="join-password-input"
+                  className="mt-2 h-11 bg-white border-slate-200 placeholder:text-slate-400"
+                  placeholder="Enter a password (min 6 characters)"
+                />
+              </div>
+              <div>
+                <Label htmlFor="confirm_password" className="text-slate-700 font-medium">Confirm Password</Label>
+                <Input
+                  id="confirm_password"
+                  type="password"
+                  value={formData.confirm_password}
+                  onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value.slice(0, 128) })}
+                  required
+                  minLength={6}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  data-testid="join-confirm-password-input"
+                  className="mt-2 h-11 bg-white border-slate-200 placeholder:text-slate-400"
+                  placeholder="Confirm your password"
+                />
               </div>
 
               {error && (
@@ -172,7 +240,7 @@ const JoinClass = () => {
                 </div>
               )}
 
-              <Button type="submit" disabled={submitting} data-testid="join-submit-button" className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
+              <Button type="submit" disabled={submitting || !formData.name.trim() || !formData.roll_number.trim() || !formData.password || !formData.confirm_password} data-testid="join-submit-button" className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
                 {submitting ? 'Joining...' : 'Join Class'}
               </Button>
             </form>

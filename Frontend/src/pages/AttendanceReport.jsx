@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
@@ -19,10 +19,7 @@ const AttendanceReport = () => {
   const [report, setReport] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchClasses(); }, []);
-  useEffect(() => { if (selectedClass) fetchReport(); }, [selectedClass]);
-
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async () => {
     try {
       const res = await api.get('/api/classes');
       if (res.data.success) {
@@ -35,16 +32,24 @@ const AttendanceReport = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     try {
       const res = await api.get(`/api/attendance/report/${selectedClass}`);
       if (res.data.success) setReport(res.data.data.report);
     } catch (error) {
       toast.error('Failed to fetch report');
     }
-  };
+  }, [selectedClass]);
+
+  useEffect(() => {
+    fetchClasses();
+  }, [fetchClasses]);
+
+  useEffect(() => {
+    if (selectedClass) fetchReport();
+  }, [selectedClass, fetchReport]);
 
   const handleExportCSV = async () => {
     try {
@@ -66,18 +71,10 @@ const AttendanceReport = () => {
 
   const getStatusBadge = (row) => {
     if (row.total === 0) return 'bg-slate-100 text-slate-500';
-    return row.is_eligible
-      ? 'bg-emerald-100 text-emerald-700'
-      : 'bg-rose-100 text-rose-700';
+    if (row.status === 'Safe') return 'bg-emerald-100 text-emerald-700';
+    if (row.status === 'Warning') return 'bg-amber-100 text-amber-700';
+    return 'bg-rose-100 text-rose-700';
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-4 md:p-8" data-testid="attendance-report-page">
@@ -86,9 +83,15 @@ const AttendanceReport = () => {
         <p className="mt-2 text-sm md:text-base text-slate-600">View attendance summary per student</p>
       </div>
 
-      <Card className="p-4 md:p-6 mb-6 bg-white border border-slate-200 rounded-lg shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900"></div>
+        </div>
+      ) : (
+        <>
+          <Card className="p-4 md:p-6 mb-6 bg-white border border-slate-200 rounded-lg shadow-sm">
+        <div className="grid grid-cols-1 min-[640px]:grid-cols-[1fr_auto] gap-4">
+          <div>
             <Label className="text-slate-700 font-medium mb-2 block">Select Class</Label>
             <Select value={selectedClass} onValueChange={setSelectedClass}>
               <SelectTrigger data-testid="class-filter" className="bg-white border-slate-200">
@@ -121,7 +124,7 @@ const AttendanceReport = () => {
       {report.length > 0 ? (
         <Card className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full" data-testid="report-table">
+            <table className="w-full min-w-[820px]" data-testid="report-table">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase">Roll No</th>
@@ -149,7 +152,10 @@ const AttendanceReport = () => {
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(s)}`}>{s.percentage}%</span>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.is_eligible ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${getStatusBadge(s)}`}>
+                        {s.total === 0 ? 'No records' : s.status}
+                      </span>
+                      <span className="hidden">
                         {s.total === 0 ? '—' : s.is_eligible ? 'Eligible' : 'Shortage'}
                       </span>
                     </td>
@@ -165,6 +171,8 @@ const AttendanceReport = () => {
           <h3 className="text-xl font-bold text-slate-900 mb-2">No Records Yet</h3>
           <p className="text-slate-600">Mark attendance to see reports here</p>
         </Card>
+      )}
+      </>
       )}
     </div>
   );

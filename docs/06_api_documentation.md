@@ -10,7 +10,8 @@
 
 | Date | Version | Description | Author |
 |---|---|---|---|
-| 2026-07-12 | v1.0.0 | Added comprehensive 76-endpoint API Coverage Matrix and verified route signatures. | Principal Software Architect |
+| 2026-07-12 | v1.0.0 | Added comprehensive 75-endpoint API Coverage Matrix and verified route signatures. | Principal Software Architect |
+| 2026-07-12 | v1.0.0-p1 | Corrected endpoint count from 76→75 after `GET /api/admin/profile` duplicate route was removed. The Coverage Matrix previously listed both copies; the stale row has been removed. | Release Audit |
 
 ---
 
@@ -58,7 +59,10 @@ All API endpoints are mounted under: `/api` (relative to backend host origin).
 
 ## 2. API Coverage Matrix
 
-This matrix documents all **76 endpoints** implemented in the `server.py` codebase.
+This matrix documents all **75 endpoints** implemented in the `server.py` codebase.
+
+> [!NOTE]
+> The duplicate `GET /api/admin/profile` route that appeared in an earlier version of this document has been removed. The dead handler (which always returned `managed_classes: []`) was deleted from `server.py` during the V1 stabilisation phase. Only the correct, live handler remains.
 
 | Method | Route | Auth? | Allowed Roles | DB Collections | Doc Section |
 |:---:|---|:---:|---|---|---|
@@ -67,8 +71,7 @@ This matrix documents all **76 endpoints** implemented in the `server.py` codeba
 | **PUT** | `/api/academic-updates/{update_id}` | Yes | Admin | `academic_updates` | Section 7 |
 | **DELETE** | `/api/academic-updates/{update_id}` | Yes | Admin | `academic_updates` | Section 7 |
 | **GET** | `/api/admin/dashboard` | Yes | Admin | `classes`, `students`, `attendance` | Section 4 |
-| **GET** | `/api/admin/profile` *(Duplicate 1)* | Yes | Admin | `admins` | Section 3 |
-| **GET** | `/api/admin/profile` *(Duplicate 2)* | Yes | Admin | `admins`, `classes` | Section 3 |
+| **GET** | `/api/admin/profile` | Yes | Admin | `admins`, `classes` | Section 3 |
 | **POST** | `/api/admin/students/{student_id}/reset-password` | Yes | Super Admin | `students` | Section 3 |
 | **GET** | `/api/announcements` | Yes | Admin | `announcements`, `classes` | Section 7 |
 | **POST** | `/api/announcements` | Yes | Admin | `announcements` | Section 7 |

@@ -33,14 +33,21 @@ pytestmark = pytest.mark.skipif(
 def _admin_session():
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
-    s.cookies.set("session_id", ADMIN_SESSION)
+    s.cookies.set("auth_token", ADMIN_SESSION)
     return s
 
 
-def _student_session(roll_number: str):
+def _student_session(roll_number: str, password: str | None = None):
+    """Log in as a student and return an authenticated requests.Session.
+
+    password defaults to roll_number (the V1 migration default).
+    """
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
-    r = s.post(f"{BASE_URL}/api/auth/student-login", json={"roll_number": roll_number})
+    r = s.post(
+        f"{BASE_URL}/api/auth/student-login",
+        json={"roll_number": roll_number, "password": password or roll_number},
+    )
     assert r.status_code == 200, f"Student login failed: {r.status_code} {r.text}"
     assert r.json()["success"] is True
     return s

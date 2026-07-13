@@ -6,11 +6,11 @@
 
 ---
 
-## Revision History
+## Revisio
+| 2026-07-12 | v1.0.0 | Initial compilation of softwn History
 
 | Date | Version | Description | Author |
-|---|---|---|---|
-| 2026-07-12 | v1.0.0 | Initial compilation of software requirements based on verified V1 codebase execution. | Principal Software Architect |
+|---|---|---|---|are requirements based on verified V1 codebase execution. | Principal Software Architect |
 
 ---
 
@@ -84,7 +84,7 @@ The high-level functions of the system are divided by target audience:
 * **Requirement**: The system must authenticate administrative accounts via Google OAuth.
 * **Inputs**: Google OAuth token provided in Callback browser hash.
 * **Process**: 
-  1. Post token to `/api/auth/google-session`.
+  1. Post token to `/api/auth/google-admin`.
   2. Verify email belongs to the `approved_admins` collection.
   3. Generate and store session cookie containing `auth_token`.
 * **Output**: Sets HTTP-Only secure cookie, returns admin user schema.

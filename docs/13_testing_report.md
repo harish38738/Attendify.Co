@@ -11,6 +11,7 @@
 | Date | Version | Description | Author |
 |---|---|---|---|
 | 2026-07-12 | v1.0.0 | Compiled test suite mappings, verification guidelines, and calculation formulas. | QA Lead |
+| 2026-07-12 | v1.0.1 | Post-release patch: added missing `password` field to all `POST /api/auth/student-login` payloads in active tests. Explicitly skipped obsolete test suites (`test_attendify_api.py` and `test_new_features.py`) targeting the removed password-based admin login (`/api/auth/login`) using module-level `pytestmark` decorators. | QA Lead |
 
 ---
 

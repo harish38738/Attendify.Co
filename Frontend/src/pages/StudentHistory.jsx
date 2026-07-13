@@ -11,7 +11,7 @@ const StudentHistory = () => {
     fetchHistory();
   }, []);
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (silent = false) => {
     try {
       const res = await api.get('/api/student/dashboard');
       if (res.data.success) {
@@ -20,7 +20,7 @@ const StudentHistory = () => {
     } catch (error) {
       console.error('Failed to fetch history:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -33,14 +33,6 @@ const StudentHistory = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 md:p-8" data-testid="student-history-page">
       <div className="mb-6 md:mb-8">
@@ -48,13 +40,18 @@ const StudentHistory = () => {
         <p className="mt-2 text-sm md:text-base text-slate-600">Your complete attendance records</p>
       </div>
 
-      {history.length > 0 ? (
+      {loading ? (
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900"></div>
+        </div>
+      ) : history.length > 0 ? (
         <Card className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full" data-testid="history-table">
+            <table className="w-full min-w-[560px]" data-testid="history-table">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Date</th>
+                  <th className="py-3 px-4 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Subject</th>
                   <th className="py-3 px-4 text-center text-xs font-medium text-slate-600 uppercase tracking-wider">Period</th>
                   <th className="py-3 px-4 text-center text-xs font-medium text-slate-600 uppercase tracking-wider">Status</th>
                 </tr>
@@ -63,6 +60,7 @@ const StudentHistory = () => {
                 {history.map((record, i) => (
                   <tr key={i} data-testid={`history-row-${i}`} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4 text-sm font-medium text-slate-900">{record.date}</td>
+                    <td className="py-3 px-4 text-sm text-slate-700">{record.subject || 'Class'}</td>
                     <td className="py-3 px-4 text-center text-sm text-slate-700">Period {record.period_number}</td>
                     <td className="py-3 px-4 text-center">
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(record.status)}`}>
