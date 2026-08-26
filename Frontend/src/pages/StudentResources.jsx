@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useAnalyticsTrack } from '../utils/analytics';
 
 const StudentResources = () => {
   const navigate = useNavigate();
@@ -36,6 +37,8 @@ const StudentResources = () => {
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+
+  useAnalyticsTrack('resources_viewed');
 
   useEffect(() => {
     fetchSubjects();

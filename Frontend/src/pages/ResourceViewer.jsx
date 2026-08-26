@@ -16,6 +16,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import LoadingScreen from '../components/LoadingScreen';
 import { toast } from 'sonner';
+import { useAnalyticsTrack } from '../utils/analytics';
 
 const metadataRows = (resource) => [
   ['Filename', resource.filename],
@@ -38,6 +39,8 @@ const ResourceViewer = ({ audience = 'admin' }) => {
   const backPath = audience === 'student' ? '/student/resources' : '/resources';
   const previewUrl = useMemo(() => (resource ? getResourcePreviewUrl(resource.id) : ''), [resource]);
   const viewerType = getResourceViewerType(resource);
+
+  useAnalyticsTrack('resource_opened', { resource_id: resourceId }, audience === 'student' && !!resourceId);
 
   useEffect(() => {
     const fetchResource = async () => {

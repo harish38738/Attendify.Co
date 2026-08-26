@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import TimetableViewer from '../components/TimetableViewer';
 import { useAuth } from '../context/AuthContext';
 import OnboardingExperience from '../components/OnboardingExperience';
+import { useAnalyticsTrack, trackEvent } from '../utils/analytics';
 
 const StudentDashboard = () => {
   const { user, completeOnboarding } = useAuth();
@@ -18,6 +19,9 @@ const StudentDashboard = () => {
   const [displayPercentage, setDisplayPercentage] = useState(0);
   const [attendanceChange, setAttendanceChange] = useState(null);
   const displayPercentageRef = useRef(0);
+
+  // Track dashboard view once per mount
+  useAnalyticsTrack('dashboard_viewed');
 
   useEffect(() => {
     fetchDashboard();
@@ -316,7 +320,7 @@ const StudentDashboard = () => {
               </div>
               {!data.day_order?.day_order ? (
                 <div className="py-10 text-center"><Clock3 className="mx-auto mb-3 h-10 w-10 text-slate-300" /><p className="text-sm text-slate-500">Today's Day Order has not been selected yet.</p></div>
-              ) : data.timetable ? <div><div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50"><img src={(api.defaults.baseURL || '') + (data?.timetable?.image_url || '') + '?v=' + (data?.timetable?.version || '')} alt="Class timetable" className="h-48 w-full object-contain" /></div><div className="mb-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-2"><p><span className="font-semibold text-slate-700">Uploaded:</span> {data?.timetable?.uploaded_at ? new Date(data.timetable.uploaded_at).toLocaleString() : ''}</p><p><span className="font-semibold text-slate-700">Updated:</span> {data?.timetable?.updated_at ? new Date(data.timetable.updated_at).toLocaleString() : ''}</p></div><Button onClick={() => setTimetableOpen(true)} className="bg-blue-900 hover:bg-blue-800"><Eye className="mr-2 h-4 w-4" />View Timetable</Button></div> : <div className="py-10 text-center"><Clock3 className="mx-auto mb-3 h-10 w-10 text-slate-300" /><p className="text-sm text-slate-500">No timetable uploaded yet.</p></div>}
+              ) : data.timetable ? <div><div className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50"><img src={(api.defaults.baseURL || '') + (data?.timetable?.image_url || '') + '?v=' + (data?.timetable?.version || '')} alt="Class timetable" className="h-48 w-full object-contain" /></div><div className="mb-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-2"><p><span className="font-semibold text-slate-700">Uploaded:</span> {data?.timetable?.uploaded_at ? new Date(data.timetable.uploaded_at).toLocaleString() : ''}</p><p><span className="font-semibold text-slate-700">Updated:</span> {data?.timetable?.updated_at ? new Date(data.timetable.updated_at).toLocaleString() : ''}</p></div><Button onClick={() => { setTimetableOpen(true); trackEvent('timetable_viewed'); }} className="bg-blue-900 hover:bg-blue-800"><Eye className="mr-2 h-4 w-4" />View Timetable</Button></div> : <div className="py-10 text-center"><Clock3 className="mx-auto mb-3 h-10 w-10 text-slate-300" /><p className="text-sm text-slate-500">No timetable uploaded yet.</p></div>}
             </Card>
             <Card className="dashboard-enter dashboard-enter-3 h-full p-4 md:p-6 bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="mb-4 flex items-center gap-2"><Megaphone className="h-5 w-5 text-blue-700" /><h2 className="text-lg font-bold text-slate-900 font-heading">Latest Announcements</h2></div>

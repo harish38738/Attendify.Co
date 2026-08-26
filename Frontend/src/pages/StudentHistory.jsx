@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { Card } from '../components/ui/card';
 import { CalendarCheck } from 'lucide-react';
+import { useAnalyticsTrack } from '../utils/analytics';
 
 const StudentHistory = () => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useAnalyticsTrack('attendance_history_viewed');
 
   useEffect(() => {
     fetchHistory();

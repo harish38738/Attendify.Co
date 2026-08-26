@@ -18,6 +18,7 @@ import {
   Compass
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAnalyticsTrack } from '../utils/analytics';
 
 const StudentAcademicUpdates = () => {
   const navigate = useNavigate();
@@ -29,6 +30,8 @@ const StudentAcademicUpdates = () => {
     missed_while_absent: []
   });
   const [loading, setLoading] = useState(true);
+
+  useAnalyticsTrack('announcements_viewed');
 
   const fetchUpdates = async () => {
     try {

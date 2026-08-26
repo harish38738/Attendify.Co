@@ -3,9 +3,12 @@ import AttendanceMarking from './AttendanceMarking';
 import AttendanceReport from './AttendanceReport';
 import { CalendarCheck, BarChart3 } from 'lucide-react';
 import SegmentedControl from '../components/SegmentedControl';
+import { useAnalyticsTrack } from '../utils/analytics';
 
 const AttendancePage = () => {
   const [activeTab, setActiveTab] = useState('marking');
+
+  useAnalyticsTrack('attendance_viewed');
 
   return (
     <div className="flex flex-col h-full bg-slate-50">

@@ -34,6 +34,7 @@ import AttendancePage from './pages/AttendancePage';
 import UpdatesPage from './pages/UpdatesPage';
 import ReportIssue from './pages/ReportIssue';
 import Reports from './pages/Reports';
+import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
@@ -85,6 +86,7 @@ const AppRoutes = () => {
         <Route path="academic-updates" element={<AcademicUpdates />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="report-issue" element={<ReportIssue />} />
+        <Route path="analytics" element={<SuperAdminAnalyticsRoute />} />
       </Route>
 
       {/* Student Routes */}
@@ -116,6 +118,14 @@ const AppRoutes = () => {
 const AdminReportsRoute = () => {
   const { user } = useAuth();
   return user?.role === 'super_admin' ? <Reports /> : <AttendanceReport />;
+};
+
+const SuperAdminAnalyticsRoute = () => {
+  const { user } = useAuth();
+  if (user?.role !== 'super_admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <AnalyticsDashboard />;
 };
 
 function App() {

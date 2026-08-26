@@ -384,6 +384,28 @@ class OnboardingSettingsUpdate(BaseModel):
     onboardingMode: Literal['first_login_only', 'every_login']
 
 # ===========================
+# Analytics Constants & Models
+# ===========================
+
+# Allowlist of valid event names. Add new events here as Attendify grows.
+VALID_ANALYTICS_EVENTS = {
+    "login",
+    "dashboard_viewed",
+    "attendance_viewed",
+    "attendance_history_viewed",
+    "timetable_viewed",
+    "resources_viewed",
+    "resource_opened",
+    "announcements_viewed",
+    "classmates_viewed",
+    "profile_viewed",
+}
+
+class AnalyticsEventCreate(BaseModel):
+    event: str
+    metadata: Optional[dict] = None
+
+# ===========================
 # Helper Functions
 # ===========================
 
@@ -1044,6 +1066,13 @@ async def startup():
         name="attendance_unique_composite"
     )
 
+    # Analytics indexes — no TTL, events are kept permanently for historical analysis
+    await db.analytics_events.create_index([("user_id", 1)])
+    await db.analytics_events.create_index([("event", 1)])
+    await db.analytics_events.create_index([("timestamp", -1)])
+    await db.analytics_events.create_index([("user_id", 1), ("timestamp", -1)], name="analytics_user_time")
+    await db.analytics_events.create_index([("event", 1), ("timestamp", -1)], name="analytics_event_time")
+
     logger.info("Indexes ensured")
 
 
@@ -1135,6 +1164,21 @@ async def google_admin_login(request: Request, req: GoogleAdminLoginRequest, res
         path="/",
         max_age=7 * 86400
     )
+
+    # Track admin login event (fire-and-forget — never blocks login)
+    async def _track_admin_login():
+        try:
+            await db.analytics_events.insert_one({
+                "user_id": admin_id,
+                "user_role": "super_admin" if is_owner else "admin",
+                "event": "login",
+                "timestamp": datetime.now(timezone.utc),
+                "metadata": {},
+            })
+        except Exception:
+            pass
+    asyncio.create_task(_track_admin_login())
+
     return APIResponse(
         success=True,
         message="Login successful",
@@ -1189,6 +1233,22 @@ async def student_login(request: Request, login_data: StudentLogin, response: Re
         path="/",
         max_age=86400
     )
+
+    # Track student login event (fire-and-forget — never blocks login)
+    _student_id_for_analytics = student["id"]
+    async def _track_student_login():
+        try:
+            await db.analytics_events.insert_one({
+                "user_id": _student_id_for_analytics,
+                "user_role": "student",
+                "event": "login",
+                "timestamp": datetime.now(timezone.utc),
+                "metadata": {},
+            })
+        except Exception:
+            pass
+    asyncio.create_task(_track_student_login())
+
     return APIResponse(
         success=True,
         message="Login successful",
@@ -3225,6 +3285,323 @@ async def student_academic_updates(request: Request):
             "missed_while_absent": missed_while_absent,
         }
     ).model_dump()
+
+# ===========================
+# Analytics Endpoints
+# ===========================
+
+async def _require_super_admin(request: Request) -> dict:
+    """Dependency: requires valid session with role == super_admin. Returns admin record."""
+    session = await _get_valid_session(request)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if session.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Analytics access is restricted to Super Admin.")
+    admin = await db.admins.find_one({"id": session["user_id"]}, {"_id": 0})
+    if not admin:
+        raise HTTPException(status_code=401, detail="Admin not found")
+    if admin.get("role") != "super_admin":
+        raise HTTPException(status_code=403, detail="Analytics access is restricted to Super Admin.")
+    return admin
+
+
+def _period_to_start_dt(period: str) -> datetime:
+    """Convert a period string to a UTC start datetime for filtering."""
+    now = datetime.now(timezone.utc)
+    if period == "today":
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == "30d":
+        return now - timedelta(days=30)
+    # Default: 7d
+    return now - timedelta(days=7)
+
+
+@api_router.post("/analytics/event")
+async def track_analytics_event(request: Request, body: AnalyticsEventCreate):
+    """
+    Record a product analytics event.
+    - Requires valid authentication (any role).
+    - user_id is always sourced from the authenticated session — never from request body.
+    - Event name must be in the VALID_ANALYTICS_EVENTS allowlist.
+    - Always returns 200 even on analytics failure (never blocks the user).
+    """
+    try:
+        session = await _get_valid_session(request)
+        if not session:
+            return JSONResponse(status_code=200, content={"success": False, "message": "Not authenticated"})
+
+        event_name = (body.event or "").strip()
+        if event_name not in VALID_ANALYTICS_EVENTS:
+            return JSONResponse(status_code=200, content={"success": False, "message": "Invalid event"})
+
+        # Sanitize metadata — only store safe scalar values
+        safe_metadata: dict = {}
+        if body.metadata and isinstance(body.metadata, dict):
+            for k, v in body.metadata.items():
+                if isinstance(v, (str, int, float, bool)) and isinstance(k, str):
+                    safe_metadata[str(k)[:64]] = v
+
+        await db.analytics_events.insert_one({
+            "user_id": session["user_id"],
+            "user_role": session.get("role", "unknown"),
+            "event": event_name,
+            "timestamp": datetime.now(timezone.utc),
+            "metadata": safe_metadata,
+        })
+        return {"success": True, "message": "Event recorded"}
+    except Exception as exc:
+        logger.warning(f"Analytics event recording failed (non-critical): {exc}")
+        return {"success": False, "message": "Analytics unavailable"}
+
+
+@api_router.get("/analytics/dashboard")
+async def get_analytics_dashboard(request: Request, period: str = "7d"):
+    """
+    Super_Admin-only analytics dashboard.
+    Returns dynamically computed metrics from the analytics_events collection.
+    period: 'today' | '7d' (default) | '30d'
+    """
+    await _require_super_admin(request)
+
+    try:
+        valid_periods = {"today", "7d", "30d"}
+        if period not in valid_periods:
+            period = "7d"
+
+        now = datetime.now(timezone.utc)
+        period_start = _period_to_start_dt(period)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # ── Total students ──
+        total_students = await db.students.count_documents({})
+
+        # ── Active users today (distinct user_ids with events today) ──
+        active_today_pipeline = [
+            {"$match": {"timestamp": {"$gte": today_start}, "user_role": "student"}},
+            {"$group": {"_id": "$user_id"}},
+            {"$count": "count"},
+        ]
+        active_today_result = await db.analytics_events.aggregate(active_today_pipeline).to_list(1)
+        active_today = active_today_result[0]["count"] if active_today_result else 0
+
+        # ── Active users in selected period ──
+        active_period_pipeline = [
+            {"$match": {"timestamp": {"$gte": period_start}, "user_role": "student"}},
+            {"$group": {"_id": "$user_id"}},
+            {"$count": "count"},
+        ]
+        active_period_result = await db.analytics_events.aggregate(active_period_pipeline).to_list(1)
+        active_in_period = active_period_result[0]["count"] if active_period_result else 0
+
+        # ── Returning users: users who have events BOTH before and within the period ──
+        # A returning user has at least one event before period_start AND one within period.
+        returning_pipeline = [
+            {"$match": {"user_role": "student"}},
+            {
+                "$group": {
+                    "_id": "$user_id",
+                    "has_before": {
+                        "$sum": {"$cond": [{"$lt": ["$timestamp", period_start]}, 1, 0]}
+                    },
+                    "has_in_period": {
+                        "$sum": {"$cond": [{"$gte": ["$timestamp", period_start]}, 1, 0]}
+                    },
+                }
+            },
+            {
+                "$match": {
+                    "has_before": {"$gt": 0},
+                    "has_in_period": {"$gt": 0},
+                }
+            },
+            {"$count": "count"},
+        ]
+        returning_result = await db.analytics_events.aggregate(returning_pipeline).to_list(1)
+        returning_users = returning_result[0]["count"] if returning_result else 0
+
+        # ── Feature usage: count distinct users per event in period ──
+        feature_usage_pipeline = [
+            {"$match": {"timestamp": {"$gte": period_start}, "user_role": "student",
+                        "event": {"$ne": "login"}}},
+            {
+                "$group": {
+                    "_id": {"event": "$event", "user_id": "$user_id"},
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$_id.event",
+                    "unique_users": {"$sum": 1},
+                }
+            },
+            {"$sort": {"unique_users": -1}},
+        ]
+        feature_usage_docs = await db.analytics_events.aggregate(feature_usage_pipeline).to_list(100)
+        feature_usage = [{"event": d["_id"], "unique_users": d["unique_users"]} for d in feature_usage_docs]
+
+        # ── Daily active users for last N days of the selected period ──
+        # Determine the number of days to show
+        if period == "today":
+            days_to_show = 1
+        elif period == "30d":
+            days_to_show = 30
+        else:
+            days_to_show = 7
+
+        daily_pipeline = [
+            {"$match": {"timestamp": {"$gte": period_start}, "user_role": "student"}},
+            {
+                "$group": {
+                    "_id": {
+                        "date": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
+                        "user_id": "$user_id",
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$_id.date",
+                    "active_users": {"$sum": 1},
+                }
+            },
+            {"$sort": {"_id": 1}},
+        ]
+        daily_docs = await db.analytics_events.aggregate(daily_pipeline).to_list(days_to_show + 5)
+        daily_active_users = [{"date": d["_id"], "active_users": d["active_users"]} for d in daily_docs]
+
+        # ── Total events in period ──
+        total_events_in_period = await db.analytics_events.count_documents(
+            {"timestamp": {"$gte": period_start}, "user_role": "student"}
+        )
+
+        return APIResponse(
+            success=True,
+            message="Analytics dashboard",
+            data={
+                "period": period,
+                "period_start": period_start.isoformat(),
+                "total_students": total_students,
+                "active_today": active_today,
+                "active_in_period": active_in_period,
+                "returning_users": returning_users,
+                "total_events_in_period": total_events_in_period,
+                "feature_usage": feature_usage,
+                "daily_active_users": daily_active_users,
+            }
+        ).model_dump()
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Analytics dashboard error: {exc}")
+        raise HTTPException(status_code=500, detail="Analytics dashboard unavailable")
+
+
+@api_router.get("/analytics/students")
+async def get_analytics_students(request: Request, period: str = "7d"):
+    """
+    Super_Admin-only per-student activity view.
+    Returns: for each student — name, roll_number, days_active_in_period, last_active, most_used_feature.
+    period: 'today' | '7d' (default) | '30d'
+    """
+    await _require_super_admin(request)
+
+    try:
+        valid_periods = {"today", "7d", "30d"}
+        if period not in valid_periods:
+            period = "7d"
+
+        period_start = _period_to_start_dt(period)
+
+        # Get all students
+        all_students = await db.students.find({}, {"_id": 0, "id": 1, "name": 1, "roll_number": 1}).to_list(10000)
+        student_map = {s["id"]: s for s in all_students}
+        student_ids = list(student_map.keys())
+
+        if not student_ids:
+            return APIResponse(
+                success=True, message="Student analytics",
+                data={"period": period, "students": []}
+            ).model_dump()
+
+        # Per-student aggregation: days active, last active, most-used feature
+        pipeline = [
+            {"$match": {"user_id": {"$in": student_ids}, "timestamp": {"$gte": period_start}}},
+            {
+                "$group": {
+                    "_id": {
+                        "user_id": "$user_id",
+                        "date": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
+                        "event": "$event",
+                    },
+                    "event_count": {"$sum": 1},
+                    "last_ts": {"$max": "$timestamp"},
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$_id.user_id",
+                    "days_active": {"$addToSet": "$_id.date"},
+                    "last_active": {"$max": "$last_ts"},
+                    "events": {
+                        "$push": {
+                            "event": "$_id.event",
+                            "count": "$event_count",
+                        }
+                    },
+                }
+            },
+        ]
+        results = await db.analytics_events.aggregate(pipeline).to_list(len(student_ids) + 10)
+
+        # Build result map
+        analytics_by_student = {}
+        for row in results:
+            uid = row["_id"]
+            days_active = len(row["days_active"])
+            last_active = row["last_active"]
+            # Most used feature (exclude 'login')
+            feature_counts = {}
+            for e in row["events"]:
+                if e["event"] != "login":
+                    feature_counts[e["event"]] = feature_counts.get(e["event"], 0) + e["count"]
+            most_used = max(feature_counts, key=feature_counts.get) if feature_counts else None
+            analytics_by_student[uid] = {
+                "days_active_in_period": days_active,
+                "last_active": last_active.isoformat() if last_active else None,
+                "most_used_feature": most_used,
+            }
+
+        # Merge with student list
+        students_out = []
+        for student in all_students:
+            sid = student["id"]
+            a = analytics_by_student.get(sid, {})
+            students_out.append({
+                "student_id": sid,
+                "name": student.get("name", ""),
+                "roll_number": student.get("roll_number", ""),
+                "days_active_in_period": a.get("days_active_in_period", 0),
+                "last_active": a.get("last_active"),
+                "most_used_feature": a.get("most_used_feature"),
+                "active_in_period": a.get("days_active_in_period", 0) > 0,
+            })
+
+        # Sort: most active first
+        students_out.sort(key=lambda s: s["days_active_in_period"], reverse=True)
+
+        return APIResponse(
+            success=True,
+            message="Student analytics",
+            data={"period": period, "students": students_out}
+        ).model_dump()
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Analytics students error: {exc}")
+        raise HTTPException(status_code=500, detail="Student analytics unavailable")
+
 
 @api_router.get("/health")
 async def health_check():

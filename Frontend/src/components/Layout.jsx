@@ -17,6 +17,7 @@ import {
   Megaphone,
   User,
   BookMarked,
+  BarChart2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -44,6 +45,7 @@ const Layout = () => {
     { name: 'Resources', href: '/resources', icon: LibraryBig, roles: ['admin', 'super_admin'] },
     { name: 'Timetable', href: '/timetable', icon: Clock3, roles: ['admin', 'super_admin'] },
     { name: 'Updates', href: '/updates', icon: Megaphone, roles: ['admin', 'super_admin'] },
+    { name: 'Analytics', href: '/analytics', icon: BarChart2, roles: ['super_admin'] },
   ];
 
   const studentNavigation = [

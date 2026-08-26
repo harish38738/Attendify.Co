@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { Card } from '../components/ui/card';
 import { Users, User } from 'lucide-react';
+import { useAnalyticsTrack } from '../utils/analytics';
 
 const StudentClassmates = () => {
   const [classmates, setClassmates] = useState([]);
   const [className, setClassName] = useState('');
   const [loading, setLoading] = useState(true);
+
+  useAnalyticsTrack('classmates_viewed');
 
   useEffect(() => {
     fetchClassmates();

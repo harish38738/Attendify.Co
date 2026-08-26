@@ -6,6 +6,7 @@ import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { BookOpen, Hash, GraduationCap, Building2, Calendar, LogOut, KeyRound, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAnalyticsTrack } from '../utils/analytics';
 
 const StudentProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -16,6 +17,8 @@ const StudentProfile = () => {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const { logout, changeStudentPassword } = useAuth();
   const navigate = useNavigate();
+
+  useAnalyticsTrack('profile_viewed');
 
   useEffect(() => {
     api.get('/api/student/profile')
