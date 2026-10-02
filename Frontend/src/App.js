@@ -20,6 +20,7 @@ import StudentResources from './pages/StudentResources';
 import ResourceViewer from './pages/ResourceViewer';
 import StudentProfile from './pages/StudentProfile';
 import StudentNotifications from './pages/StudentNotifications';
+import StudentChat from './pages/StudentChat';
 import Timetable from './pages/Timetable';
 import Announcements from './pages/Announcements';
 import AdminProfile from './pages/AdminProfile';
@@ -108,6 +109,7 @@ const AppRoutes = () => {
         <Route path="profile" element={<StudentProfile />} />
         <Route path="report-issue" element={<ReportIssue />} />
         <Route path="notifications" element={<StudentNotifications />} />
+        <Route path="chat" element={<StudentChat />} />
       </Route>
 
       <Route path="*" element={<RoleBasedRedirect />} />

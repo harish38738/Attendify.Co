@@ -17,6 +17,7 @@ import {
   Megaphone,
   User,
   BookMarked,
+  MessageCircle,
   BarChart2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -49,6 +50,7 @@ const Layout = () => {
   ];
 
   const studentNavigation = [
+    { name: 'Chat', href: '/student/chat', icon: MessageCircle },
     { name: 'Dashboard', href: '/student/dashboard', icon: LayoutDashboard },
     { name: 'Classmates', href: '/student/classmates', icon: Users },
     { name: 'Resources', href: '/student/resources', icon: BookOpen },
@@ -330,22 +332,34 @@ const Layout = () => {
             <p className="mt-1.5 text-[10px] leading-tight text-slate-500">by HRK Technologies</p>
           </div>
           {user?.role === 'student' ? (
-            <button
-              onClick={() => navigate('/student/notifications')}
-              aria-label="Open notifications"
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-slate-100 transition-colors"
-              data-testid="mobile-notifications-button"
-            >
-              <Bell className="h-6 w-6 text-slate-700" />
-              {unreadCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold text-white">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-          ) : (
-            <div className="w-10" />
-          )}
+  <div className="flex items-center gap-1">
+    <button
+      onClick={() => navigate('/student/notifications')}
+      aria-label="Open notifications"
+      className="relative inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-slate-100 transition-colors"
+      data-testid="mobile-notifications-button"
+    >
+      <Bell className="h-6 w-6 text-slate-700" />
+      {unreadCount > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold text-white">
+          {unreadCount}
+        </span>
+      )}
+    </button>
+
+    <button
+      type="button"
+      onClick={() => navigate('/student/profile')}
+      aria-label="Open profile"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-slate-100 transition-colors"
+      data-testid="mobile-profile-button"
+    >
+      <User className="h-6 w-6 text-slate-700" />
+    </button>
+  </div>
+) : (
+  <div className="w-10" />
+)}
         </header>
 
 
@@ -405,6 +419,16 @@ const Layout = () => {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <button
+              type="button"
+              onClick={() => navigate('/student/profile')}
+              aria-label="Open profile"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+              data-testid="profile-trigger"
+            >
+              <User className="h-5 w-5" />
+            </button>
           </header>
         )}
 
